@@ -1,14 +1,15 @@
-# SciPlot Academic — 包使用 Skill (v1.4)
+# SciPlot Academic — 包使用 Skill (v1.5)
 
 ---
 name: sciplot
 description: >
-  科研绘图技能（sciplot-academic 包版）。凡涉及学术图表、论文插图、数据可视化、
+  科研绘图技能（sciplot-academic 包版 v1.5）。凡涉及学术图表、论文插图、数据可视化、
   matplotlib/scienceplots 绘图、期刊格式配图、毕设/竞赛图片等需求，必须调用本技能。
   本技能针对已安装 sciplot-academic 包的环境，直接 `import sciplot as sp` 使用，
   无需复制任何文件到项目目录。
-  默认中文 + Nature 期刊样式 + pastel 配色，支持 IEEE/APS/Springer/学位论文，
+  默认中文 + Nature 期刊样式 + pastel 配色，支持 IEEE/APS/Springer/Thesis 学位论文，
   提供折线、散点、柱状、箱线、小提琴、热力图、误差条、置信区间、多子图等全类型图表。
+  新增 ML 可视化扩展（PCA/混淆矩阵/特征重要性/学习曲线）。
 ---
 
 ## 0. 安装方式
@@ -25,6 +26,9 @@ uv pip install sciplot-academic
 # conda 环境（需先安装依赖）
 conda install -c conda-forge matplotlib numpy
 pip install scienceplots sciplot-academic
+
+# ML 扩展（可选，需要 scikit-learn）
+uv pip install sciplot-academic[ml]
 ```
 
 安装后，**在任何项目中**直接使用：
@@ -65,14 +69,13 @@ fig, ax = sp.plot_multi(x, [y1,y2,y3,y4,y5,y6], labels=[...], palette="rainbow-6
 
 ## 2. 三大核心函数
 
-### `sp.setup_style(venue, palette, lang, use_latex)`
+### `sp.setup_style(venue, palette, lang)`
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `venue` | `"nature"` | 期刊/场合预设 |
 | `palette` | `"pastel"` | 配色方案 |
 | `lang` | `"zh"` | `"zh"`/`"zh-cn"` 中文宋体，`"en"` 英文 Times New Roman |
-| `use_latex` | `False` | 已全局禁用（传 True 会警告并被忽略） |
 
 ```python
 sp.setup_style()                           # 默认：nature + pastel + 中文
@@ -91,13 +94,14 @@ fig, axes  = sp.new_figure("thesis", nrows=1, ncols=2, sharex=True)
 fig, ax    = sp.new_figure(figsize=(5.0, 3.5))   # 完全自定义
 ```
 
-### `sp.save(fig, name, dpi, formats)`
+### `sp.save(fig, name, dpi, formats, dir)`
 
 ```python
 sp.save(fig, "figure_1")                             # PDF + PNG 1200 DPI（默认）
 sp.save(fig, "word稿", formats=("png",), dpi=1200)   # 仅 PNG，Word 用
-sp.save(fig, "投稿", formats=("pdf",))               # 仅 PDF，LaTeX 用
+sp.save(fig, "投稿", formats=("pdf",))                # 仅 PDF，LaTeX 用
 sp.save(fig, "draft", dpi=150, formats=("png",))     # 快速预览
+sp.save(fig, "fig", dir="outputs")                   # 保存到 outputs 目录
 ```
 
 ---
@@ -139,6 +143,19 @@ sp.save(fig, "draft", dpi=150, formats=("png",))     # 快速预览
 
 `100yuan`(红) / `50yuan`(绿) / `20yuan`(棕) / `10yuan`(蓝) / `5yuan`(紫) / `1yuan`(橄榄)
 
+### 自定义配色
+
+```python
+# 设置自定义配色
+sp.set_custom_palette(["#E74C3C", "#3498DB", "#2ECC71"], name="mycolors")
+
+# 使用完整配色
+sp.setup_style(palette="mycolors")
+
+# 使用子集（1-3色）
+sp.setup_style(palette="mycolors-2")
+```
+
 ---
 
 ## 5. 全图表函数速查
@@ -171,7 +188,34 @@ sp.plot_heatmap(data, cmap="Blues", show_values=False, fmt=".2f", ...)
 
 ---
 
-## 6. 高级布局
+## 6. 机器学习可视化（扩展）
+
+需要安装：`uv pip install sciplot-academic[ml]`
+
+```python
+from sciplot._ext.ml import (
+    plot_pca,
+    plot_confusion_matrix,
+    plot_feature_importance,
+    plot_learning_curve,
+)
+
+# PCA 可视化
+fig, ax = plot_pca(data, labels=labels, n_components=2, venue="nature")
+
+# 混淆矩阵
+fig, ax = plot_confusion_matrix(y_true, y_pred, labels=["Class A", "Class B"], venue="ieee")
+
+# 特征重要性
+fig, ax = plot_feature_importance(features, importance, venue="thesis")
+
+# 学习曲线
+fig, ax = plot_learning_curve(train_scores, val_scores, venue="nature")
+```
+
+---
+
+## 7. 高级布局
 
 ### 规则子图
 
@@ -179,6 +223,39 @@ sp.plot_heatmap(data, cmap="Blues", show_values=False, fmt=".2f", ...)
 fig, axes = sp.create_subplots(2, 2, venue="ieee", sharex=True)
 axes[0,0].plot(x, y1);  axes[0,0].set_title("(a)")
 sp.save(fig, "multi_panel", formats=("pdf",))
+```
+
+### 论文子图布局（推荐）
+
+```python
+# Word 论文 1×2 子图
+fig, axes = sp.paper_subplots(1, 2, venue="thesis")
+axes[0].plot(x, y1); axes[0].set_title("(a) 方法A")
+axes[1].plot(x, y2); axes[1].set_title("(b) 方法B")
+sp.save(fig, "word_double", formats=("png",), dpi=1200)
+
+# IEEE 2×2 子图
+fig, axes = sp.paper_subplots(2, 2, venue="ieee")
+```
+
+### 查看子图尺寸
+
+```python
+sp.list_paper_layouts()           # 查看所有布局
+sp.list_paper_layouts("thesis")   # 只看 Word 论文尺寸
+sp.list_paper_layouts("ieee")     # 只看 IEEE 尺寸
+```
+
+输出示例：
+```python
+{
+    "thesis": {
+        "1x1": (6.1, 4.3),
+        "1x2": (6.1, 3.0),
+        "2x2": (6.1, 5.0),
+    },
+    "ieee": {...}
+}
 ```
 
 ### GridSpec 不规则布局
@@ -218,26 +295,28 @@ sp.save(fig, "twin_y")
 
 ---
 
-## 7. 工具函数
+## 8. 工具函数
 
 ```python
 sp.list_venues()              # ['nature','ieee','aps','springer','thesis','presentation','default']
-sp.list_palettes()            # 所有配色名（含 rainbow-N）
+sp.list_palettes()            # 所有配色名（含 rainbow-N，含用户自定义）
 sp.list_resident_palettes()   # 三大常驻配色系（含子集）
-sp.list_pastel_subsets()      # ['pastel','pastel-1','pastel-2','pastel-3','pastel-4']
+sp.list_pastel_subsets()       # ['pastel','pastel-1','pastel-2','pastel-3','pastel-4']
 sp.list_earth_subsets()       # ['earth','earth-1','earth-2','earth-3','earth-4']
 sp.list_ocean_subsets()       # ['ocean','ocean-1','ocean-2','ocean-3','ocean-4']
 sp.list_tol_palettes()        # Paul Tol 配色
 sp.list_rmb_palettes()        # 人民币配色
 sp.list_languages()           # ['zh','zh-cn','en']
+sp.list_paper_layouts()       # 论文子图尺寸
 sp.get_venue_info("ieee")     # {'figsize': (3.5, 3.0), 'fontsize': 8, ...}
-sp.get_palette("bright")      # 返回 HEX 列表（仅自定义配色，不含 rainbow-N）
+sp.get_palette("bright")      # 返回 HEX 列表
+sp.set_custom_palette(colors, name)  # 设置自定义配色
 sp.reset_style()              # 重置 matplotlib 为默认
 ```
 
 ---
 
-## 8. AI 生成脚本的规范
+## 9. AI 生成脚本的规范
 
 **Claude 使用本技能后，必须在用户当前工作目录创建独立可运行的 Python 脚本**（如 `plot_result.py`），通过 `import sciplot as sp` 使用本库。**严禁直接执行或在脚本中写入 sciplot 源代码。**
 
@@ -301,7 +380,7 @@ print("✓ 所有图片已保存")
 
 ---
 
-## 9. 能力边界与替代方案
+## 10. 能力边界与替代方案
 
 **SciPlot 专注于学术数据图表**，以下类型**不支持**：
 
@@ -323,7 +402,7 @@ print("✓ 所有图片已保存")
 
 ---
 
-## 10. 最佳实践
+## 11. 最佳实践
 
 - **Word 用 PNG，LaTeX 用 PDF**：PDF 矢量格式勿插入 Word，PNG 勿插 LaTeX
 - **Word 多图总宽锁定**：多子图用 `new_figure(figsize=(6.1, h))` 手动控制，避免超版心
@@ -334,10 +413,18 @@ print("✓ 所有图片已保存")
 
 ---
 
-## 11. 包版本信息
+## 12. 包版本信息
 
 - 包名：`sciplot-academic`（PyPI）
 - 导入名：`import sciplot as sp`
-- 当前版本：1.4.0
+- 当前版本：**1.5.0**
 - 三大配色系：pastel / earth / ocean
 - 默认：Nature 样式 + pastel 配色 + 中文
+
+### v1.5 新增功能
+
+- 🆕 **机器学习可视化**：PCA、混淆矩阵、特征重要性、学习曲线
+- 🆕 **自定义配色**：`set_custom_palette()` 支持用户定义色组
+- 🆕 **论文子图布局**：`paper_subplots()` 和 `list_paper_layouts()`
+- 🆕 **目录保存**：`save(dir="outputs")` 支持指定目录
+- 🆕 **模块化架构**：`_core/` / `_plots/` / `_ext/` 分离
