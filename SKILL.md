@@ -1,9 +1,9 @@
-# SciPlot Academic — 包使用 Skill (v1.7)
+# SciPlot Academic — 包使用 Skill (v1.7.1)
 
 ---
 name: sciplot
 description: >
-  科研绘图技能（sciplot-academic 包版 v1.7）。凡涉及学术图表、论文插图、数据可视化、
+  科研绘图技能（sciplot-academic 包版 v1.7.1）。凡涉及学术图表、论文插图、数据可视化、
   matplotlib 绘图、期刊格式配图、毕设/竞赛图片等需求，必须调用本技能。
   本技能针对已安装 sciplot-academic 包的环境，直接 `import sciplot as sp` 使用，
   无需复制任何文件到项目目录。
@@ -11,6 +11,7 @@ description: >
   提供折线、散点、柱状、分组柱状、堆叠柱状、水平柱状、面积图、箱线、小提琴、热力图、
   阶梯图、误差条、置信区间、组合图、多子图、显著性标注等全类型图表。
   支持自定义配色方案（单/双/三/四/五色自动选择）、3D可视化扩展、智能辅助功能。
+  **新增语法糖功能**：Fluent Interface 链式调用、Context Manager 上下文管理器、简洁函数别名。
   **本版本彻底移除 rainbow/TOL 等 SciencePlots 依赖配色，所有配色均为内置。**
 ---
 
@@ -50,7 +51,114 @@ sp.save(fig, "对比")
 
 ---
 
-## 2. 核心函数
+## 2. 语法糖功能（v1.7.1 新增）
+
+### 2.1 Fluent Interface 链式调用
+
+通过链式 API 实现流畅的绘图流程，支持多图层叠加。
+
+```python
+import sciplot as sp
+import numpy as np
+
+x = np.linspace(0, 10, 100)
+
+# 基础链式调用
+fig = sp.style("nature").palette("pastel").plot(x, np.sin(x)).save("output")
+
+# 多图层叠加
+fig = (sp.style("ieee")
+         .palette("earth")
+         .plot(x, np.sin(x), label="sin")
+         .scatter(x, np.cos(x), label="cos")
+         .legend()
+         .xlabel("时间 (s)")
+         .ylabel("幅度")
+         .title("三角函数")
+         .save("multi_layer"))
+
+# 使用 chain() 入口
+fig = sp.chain(venue="thesis", palette="ocean", lang="zh").plot(x, y).save("fig")
+```
+
+**链式方法速查：**
+
+| 方法 | 说明 | 返回值 |
+|------|------|--------|
+| `sp.style(venue)` | 设置期刊样式 | PlotChain |
+| `sp.palette(name)` | 设置配色方案 | PlotChain |
+| `sp.chain(venue, palette, lang)` | 完整链式入口 | PlotChain |
+| `.plot(x, y, **kwargs)` | 添加折线 | FigureWrapper |
+| `.scatter(x, y, **kwargs)` | 添加散点 | FigureWrapper |
+| `.bar(x, y, **kwargs)` | 添加柱状图 | FigureWrapper |
+| `.xlabel(label)` | 设置 X 轴标签 | FigureWrapper |
+| `.ylabel(label)` | 设置 Y 轴标签 | FigureWrapper |
+| `.title(title)` | 设置标题 | FigureWrapper |
+| `.legend(**kwargs)` | 显示图例 | FigureWrapper |
+| `.save(name, **kwargs)` | 保存图片 | list[Path] |
+| `.show()` | 显示图形 | None |
+
+### 2.2 Context Manager 上下文管理器
+
+临时切换样式，不影响全局设置，支持嵌套使用。
+
+```python
+import sciplot as sp
+import numpy as np
+
+x = np.linspace(0, 10, 100)
+
+# 基础用法：临时切换样式
+with sp.style_context("ieee", palette="earth"):
+    fig, ax = sp.plot(x, np.sin(x))
+    sp.save(fig, "ieee_style")
+
+# 恢复默认样式继续绘图
+fig, ax = sp.plot(x, np.cos(x))  # 使用默认 nature + pastel
+
+# 嵌套上下文（内层覆盖外层）
+with sp.style_context("nature", palette="pastel"):
+    fig1, ax1 = sp.plot(x, y1)  # nature + pastel
+
+    with sp.style_context("ieee", palette="ocean"):
+        fig2, ax2 = sp.plot(x, y2)  # ieee + ocean
+
+    # 恢复为 nature + pastel
+    fig3, ax3 = sp.plot(x, y3)
+
+# 自定义 rcParams
+with sp.style_context("thesis", lang="zh", figure.dpi=200, font.size=14):
+    fig, ax = sp.plot(x, y)
+```
+
+### 2.3 简洁函数别名
+
+更短更直观的函数名，适合快速绘图。
+
+```python
+import sciplot as sp
+import numpy as np
+
+x = np.linspace(0, 10, 100)
+y = np.sin(x)
+
+# 简洁别名 vs 完整名称
+fig, ax = sp.line(x, y)           # sp.plot_line()
+fig, ax = sp.scatter(x, y)        # sp.plot_scatter()
+fig, ax = sp.bar(["A", "B"], [1, 2])  # sp.plot_bar()
+fig, ax = sp.hbar(["A", "B"], [1, 2]) # sp.plot_horizontal_bar()
+fig, ax = sp.hist(data, bins=30)  # sp.plot_histogram()
+fig, ax = sp.box([data1, data2])  # sp.plot_box()
+fig, ax = sp.violin([data1, data2])   # sp.plot_violin()
+fig, ax = sp.heatmap(matrix)      # sp.plot_heatmap()
+fig, ax = sp.area(x, y)           # sp.plot_area()
+fig, ax = sp.step(x, y)           # sp.plot_step()
+fig, ax = sp.errorbar(x, y, yerr) # sp.plot_errorbar()
+```
+
+---
+
+## 3. 核心函数
 
 ### `sp.setup_style(venue, palette, lang)`
 
@@ -65,6 +173,21 @@ sp.setup_style()                  # 默认：nature + pastel + 中文
 sp.setup_style(lang="en")         # 英文模式
 sp.setup_style("ieee", "pastel-2")  # IEEE + 前2色
 sp.setup_style("thesis", "earth-3") # 学位论文 + 大地色
+```
+
+**语言与 LaTeX 渲染说明：**
+
+- **`lang="zh"`（中文模式）**：自动**禁用 LaTeX**，确保中文正常渲染，负号使用 ASCII 减号（避免 U+2212 警告）
+- **`lang="en"`（英文模式）**：自动**启用 LaTeX**（如果系统已安装），数学公式渲染更美观
+
+```python
+# 中文论文 - 禁用 LaTeX，中文显示正常
+sp.setup_style("thesis", "pastel", lang="zh")
+fig, ax = sp.plot(x, y, xlabel="时间 (s)", ylabel="电压 (V)")
+
+# 英文论文 - 启用 LaTeX，数学公式更美观
+sp.setup_style("ieee", "pastel", lang="en")
+fig, ax = sp.plot(x, y, xlabel="Time $t$ (s)", ylabel="Voltage $V$ (V)")
 ```
 
 ### `sp.new_figure(venue, figsize, **kwargs)`
@@ -371,10 +494,17 @@ print("✓ 已保存")
 ## 12. 版本信息
 
 - 包名：`sciplot-academic`（PyPI）
-- 版本：**1.7.0**
+- 版本：**1.7.1**
 - 默认：Nature + pastel + 中文
 
-### v1.7 更新
+### v1.7.1 更新
+
+- 🆕 **Fluent Interface 链式调用** `sp.style().palette().plot().save()`，支持流畅的 API 链式操作
+- 🆕 **Context Manager 上下文管理器** `sp.style_context()`，临时切换样式不影响全局
+- 🆕 **简洁函数别名** `sp.line()`、`sp.scatter()`、`sp.bar()` 等，更直观的短名称
+- 🆕 **语言相关的 LaTeX 渲染**，中文模式自动禁用 LaTeX（避免 U+2212 警告），英文模式自动启用
+
+### v1.7.0 更新
 
 - 🆕 **配色方案系统** `register_color_scheme()`，支持单/双/三/四/五色自动选择
 - 🆕 **面积图** `plot_area()` / `plot_multi_area()`，支持堆叠模式
