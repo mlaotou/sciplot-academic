@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sciplot-academic"
+version = "1.5.0"
+description = "期刊级科研绘图库 — 基于 Matplotlib + SciencePlots，专为中文科研场景优化"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "SciPlot Team", email = "sciplot@github.com" }
+]
+keywords = [
+    "matplotlib", "scientific-plotting", "academic", "publication",
+    "nature", "ieee", "thesis", "chinese", "scienceplots"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "matplotlib>=3.5.0",
+    "numpy>=1.20.0",
+    "SciencePlots>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build",
+    "twine",
+    "pytest",
+    "pytest-cov",
+]
+ml = [
+    "scikit-learn>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/rippleshe/sciplot-academic"
+Repository = "https://github.com/rippleshe/sciplot-academic"
+Issues = "https://github.com/rippleshe/sciplot-academic/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sciplot*"]
+exclude = ["tests*", "examples*"]
+
+[tool.setuptools.package-data]
+sciplot = ["py.typed"]
