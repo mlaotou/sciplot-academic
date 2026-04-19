@@ -122,6 +122,9 @@ def plot_multi(
         >>> fig, ax = sp.plot_multi(x, [y1, y2, y3], palette="earth",
         ...                         labels=["A", "B", "C"])
     """
+    if not y_list:
+        raise ValueError("参数 'y_list' 不能为空列表")
+
     n = len(y_list)
     effective_palette = _resolve_auto_subset_palette(palette, n)
 
@@ -163,6 +166,9 @@ def plot_multi_line(
         ...     palette="ocean-3", use_linestyles=True
         ... )
     """
+    if not y_list:
+        raise ValueError("参数 'y_list' 不能为空列表")
+
     effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
@@ -366,6 +372,9 @@ def plot_multi_area(
     """
     import matplotlib.pyplot as plt
 
+    if not y_list:
+        raise ValueError("参数 'y_list' 不能为空列表")
+
     n = len(y_list)
     effective_palette = _resolve_auto_subset_palette(palette, n)
 
@@ -389,14 +398,21 @@ def plot_multi_area(
         y_stack = np.zeros(len(x))
         for i, (y, lbl) in enumerate(zip(y_list, labels)):
             color = colors[i % len(colors)]
-            ax.fill_between(x, y_stack, y_stack + y, alpha=alpha,
-                           color=color, label=lbl, **kwargs)
+            fill_kwargs = dict(kwargs)
+            fill_kwargs.pop("label", None)
+            fill_kwargs.setdefault("alpha", alpha)
+            fill_kwargs.setdefault("color", color)
+            ax.fill_between(x, y_stack, y_stack + y, label=lbl, **fill_kwargs)
             y_stack = y_stack + y
     else:
         # 独立面积图 - 使用 fill_between 的 label 参数
         for i, (y, lbl) in enumerate(zip(y_list, labels)):
             color = colors[i % len(colors)]
-            ax.fill_between(x, y, alpha=alpha, color=color, label=lbl)
+            fill_kwargs = dict(kwargs)
+            fill_kwargs.pop("label", None)
+            fill_kwargs.setdefault("alpha", alpha)
+            fill_kwargs.setdefault("color", color)
+            ax.fill_between(x, y, label=lbl, **fill_kwargs)
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)

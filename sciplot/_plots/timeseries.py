@@ -39,6 +39,57 @@ def _detect_x_type(t: np.ndarray) -> str:
     return "numeric"
 
 
+def _normalize_events(events: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    """校验并标准化事件标注配置。"""
+    if not events:
+        return []
+    if not isinstance(events, list):
+        raise TypeError("events 必须是字典列表")
+
+    normalized: List[Dict[str, Any]] = []
+    for i, event in enumerate(events):
+        if not isinstance(event, dict):
+            raise TypeError(f"events[{i}] 必须是字典")
+        if "time" not in event or event.get("time") is None:
+            raise ValueError(f"events[{i}] 缺少必需字段 'time'")
+        normalized.append(
+            {
+                "time": event["time"],
+                "label": event.get("label", ""),
+                "color": event.get("color", "red"),
+            }
+        )
+    return normalized
+
+
+def _normalize_shade_regions(
+    shade_regions: Optional[List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+    """校验并标准化背景区域配置。"""
+    if not shade_regions:
+        return []
+    if not isinstance(shade_regions, list):
+        raise TypeError("shade_regions 必须是字典列表")
+
+    normalized: List[Dict[str, Any]] = []
+    for i, region in enumerate(shade_regions):
+        if not isinstance(region, dict):
+            raise TypeError(f"shade_regions[{i}] 必须是字典")
+        if "start" not in region or region.get("start") is None:
+            raise ValueError(f"shade_regions[{i}] 缺少必需字段 'start'")
+        if "end" not in region or region.get("end") is None:
+            raise ValueError(f"shade_regions[{i}] 缺少必需字段 'end'")
+        normalized.append(
+            {
+                "start": region["start"],
+                "end": region["end"],
+                "color": region.get("color", "#CCCCCC"),
+                "alpha": region.get("alpha", 0.2),
+            }
+        )
+    return normalized
+
+
 def plot_timeseries(
     t: Union[List, np.ndarray],
     y: Union[List, np.ndarray],
@@ -96,6 +147,14 @@ def plot_timeseries(
 
     if len(t) != len(y):
         raise ValueError(f"t 长度 ({len(t)}) 与 y 长度 ({len(y)}) 不一致")
+    if rolling_mean is not None:
+        if not isinstance(rolling_mean, int):
+            raise TypeError(f"rolling_mean 必须是整数或 None，实际类型: {type(rolling_mean).__name__}")
+        if rolling_mean <= 0:
+            raise ValueError(f"rolling_mean 必须为正整数，实际值: {rolling_mean}")
+
+    events_normalized = _normalize_events(events)
+    regions_normalized = _normalize_shade_regions(shade_regions)
 
     effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
@@ -105,15 +164,17 @@ def plot_timeseries(
     colors = [c["color"] for c in plt.rcParams["axes.prop_cycle"]]
     main_color = colors[0]
 
-    if shade_regions:
-        for i, region in enumerate(shade_regions):
-            start = region.get("start")
-            end = region.get("end")
-            color = region.get("color", "#CCCCCC")
-            alpha = region.get("alpha", 0.2)
-            ax.axvspan(start, end, color=color, alpha=alpha, zorder=0)
+    for region in regions_normalized:
+        ax.axvspan(
+            region["start"],
+            region["end"],
+            color=region["color"],
+            alpha=region["alpha"],
+            zorder=0,
+        )
 
     ax.plot(t, y, label=label, marker=marker, color=main_color, **kwargs)
+    has_legend_item = bool(label)
 
     if rolling_mean and rolling_mean > 1 and len(y) >= rolling_mean:
         rolling = np.convolve(y, np.ones(rolling_mean) / rolling_mean, mode="valid")
@@ -125,25 +186,25 @@ def plot_timeseries(
             linestyle="--",
             linewidth=2,
         )
+        has_legend_item = True
 
-    if events:
-        for i, event in enumerate(events):
-            event_time = event.get("time")
-            event_label = event.get("label", "")
-            event_color = event.get("color", "red")
+    for event in events_normalized:
+        event_time = event["time"]
+        event_label = event["label"]
+        event_color = event["color"]
 
-            ax.axvline(x=event_time, color=event_color, linestyle="--", alpha=0.7)
+        ax.axvline(x=event_time, color=event_color, linestyle="--", alpha=0.7)
 
-            ax.annotate(
-                event_label,
-                xy=(event_time, 0.95),
-                xycoords=("data", "axes fraction"),
-                xytext=(5, 0),
-                textcoords="offset points",
-                ha="left", va="top",
-                fontsize=plt.rcParams.get("font.size", 9) - 1,
-                color=event_color,
-            )
+        ax.annotate(
+            event_label,
+            xy=(event_time, 0.95),
+            xycoords=("data", "axes fraction"),
+            xytext=(5, 0),
+            textcoords="offset points",
+            ha="left", va="top",
+            fontsize=plt.rcParams.get("font.size", 9) - 1,
+            color=event_color,
+        )
 
     if x_type == "datetime":
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
@@ -153,7 +214,7 @@ def plot_timeseries(
     ax.set_ylabel(ylabel)
     if title:
         ax.set_title(title)
-    if label or rolling_mean:
+    if has_legend_item:
         ax.legend()
     ax.tick_params(direction="in")
 
@@ -192,6 +253,8 @@ def plot_multi_timeseries(
         ... )
     """
     t = np.asarray(t)
+    if not y_list:
+        raise ValueError("参数 'y_list' 不能为空列表")
 
     if labels is None:
         labels = [f"系列 {i+1}" for i in range(len(y_list))]
@@ -200,6 +263,9 @@ def plot_multi_timeseries(
             f"labels 长度 ({len(labels)}) 与 y_list 长度 ({len(y_list)}) 不一致"
         )
 
+    events_normalized = _normalize_events(events)
+    regions_normalized = _normalize_shade_regions(shade_regions)
+
     effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
@@ -207,13 +273,14 @@ def plot_multi_timeseries(
 
     colors = [c["color"] for c in plt.rcParams["axes.prop_cycle"]]
 
-    if shade_regions:
-        for region in shade_regions:
-            start = region.get("start")
-            end = region.get("end")
-            color = region.get("color", "#CCCCCC")
-            alpha = region.get("alpha", 0.2)
-            ax.axvspan(start, end, color=color, alpha=alpha, zorder=0)
+    for region in regions_normalized:
+        ax.axvspan(
+            region["start"],
+            region["end"],
+            color=region["color"],
+            alpha=region["alpha"],
+            zorder=0,
+        )
 
     for i, (y, lbl) in enumerate(zip(y_list, labels)):
         y = np.asarray(y)
@@ -221,22 +288,21 @@ def plot_multi_timeseries(
             raise ValueError(f"t 长度 ({len(t)}) 与 y_list[{i}] 长度 ({len(y)}) 不一致")
         ax.plot(t, y, label=lbl, color=colors[i % len(colors)], **kwargs)
 
-    if events:
-        for event in events:
-            event_time = event.get("time")
-            event_label = event.get("label", "")
-            event_color = event.get("color", "red")
-            ax.axvline(x=event_time, color=event_color, linestyle="--", alpha=0.7)
-            ax.annotate(
-                event_label,
-                xy=(event_time, 0.95),
-                xycoords=("data", "axes fraction"),
-                xytext=(5, 0),
-                textcoords="offset points",
-                ha="left", va="top",
-                fontsize=plt.rcParams.get("font.size", 9) - 1,
-                color=event_color,
-            )
+    for event in events_normalized:
+        event_time = event["time"]
+        event_label = event["label"]
+        event_color = event["color"]
+        ax.axvline(x=event_time, color=event_color, linestyle="--", alpha=0.7)
+        ax.annotate(
+            event_label,
+            xy=(event_time, 0.95),
+            xycoords=("data", "axes fraction"),
+            xytext=(5, 0),
+            textcoords="offset points",
+            ha="left", va="top",
+            fontsize=plt.rcParams.get("font.size", 9) - 1,
+            color=event_color,
+        )
 
     if x_type == "datetime":
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
@@ -279,6 +345,8 @@ def plot_slope(
         raise ValueError(
             "labels、before、after 长度必须一致"
         )
+    if not np.all(np.isfinite(before_arr)) or not np.all(np.isfinite(after_arr)):
+        raise ValueError("before 和 after 不能包含 NaN 或 Inf")
 
     effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)

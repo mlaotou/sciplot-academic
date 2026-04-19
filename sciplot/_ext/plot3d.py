@@ -161,6 +161,21 @@ def plot_contour(
     """
     X, Y, Z = _validate_grid_shapes(X, Y, Z)
 
+    if isinstance(levels, int):
+        if levels <= 0:
+            raise ValueError(f"levels 必须为正整数，实际值: {levels}")
+    elif isinstance(levels, (list, tuple, np.ndarray)):
+        levels_arr = np.asarray(levels, dtype=float).ravel()
+        if levels_arr.size == 0:
+            raise ValueError("levels 序列不能为空")
+        if not np.all(np.isfinite(levels_arr)):
+            raise ValueError("levels 序列不能包含 NaN 或 Inf")
+        levels = levels_arr
+    else:
+        raise ValueError(
+            f"levels 必须是正整数或数值序列，实际类型: {type(levels).__name__}"
+        )
+
     effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
@@ -327,6 +342,10 @@ def plot_wireframe(
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401  # 注册 3D projection
 
     X, Y, Z = _validate_grid_shapes(X, Y, Z)
+    if not isinstance(rstride, int) or rstride <= 0:
+        raise ValueError(f"rstride 必须为正整数，实际值: {rstride!r}")
+    if not isinstance(cstride, int) or cstride <= 0:
+        raise ValueError(f"cstride 必须为正整数，实际值: {cstride!r}")
 
     effective_venue = apply_resolved_style(venue, palette, lang)
     figsize = _get_3d_figsize(effective_venue)

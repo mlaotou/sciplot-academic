@@ -43,6 +43,20 @@ class TestMultivariateHardening:
         with pytest.raises(ValueError):
             sp.plot_parallel(data)
 
+    def test_plot_parallel_zscore_not_clipped(self, cleanup_figures):
+        data = np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [1.0, 1.0, 1.0],
+                [2.0, 2.0, 2.0],
+                [10.0, 10.0, 10.0],
+            ]
+        )
+        result = sp.plot_parallel(data, normalize="zscore")
+        y_min, y_max = result.ax.get_ylim()
+        assert y_max > 1.05
+        assert y_min < -0.05
+
 
 class TestDistributionHardening:
     def test_plot_combo_validates_bar_lengths(self, cleanup_figures):
@@ -83,3 +97,33 @@ class TestTimeseriesHardening:
         result = sp.plot_timeseries(t, y)
         formatter = result.ax.xaxis.get_major_formatter()
         assert isinstance(formatter, mdates.DateFormatter)
+
+    def test_plot_timeseries_requires_event_time(self, cleanup_figures):
+        t = np.arange(5)
+        y = np.arange(5)
+        with pytest.raises(ValueError, match="events\\[0\\].*time"):
+            sp.plot_timeseries(t, y, events=[{"label": "missing time"}])
+
+    def test_plot_timeseries_requires_region_bounds(self, cleanup_figures):
+        t = np.arange(5)
+        y = np.arange(5)
+        with pytest.raises(ValueError, match="shade_regions\\[0\\].*start"):
+            sp.plot_timeseries(t, y, shade_regions=[{"end": 3}])
+
+    def test_plot_multi_timeseries_requires_event_time(self, cleanup_figures):
+        t = np.arange(5)
+        y_list = [np.arange(5), np.arange(5) + 1]
+        with pytest.raises(ValueError, match="events\\[0\\].*time"):
+            sp.plot_multi_timeseries(t, y_list, events=[{"label": "missing time"}])
+
+    def test_plot_timeseries_rejects_non_int_rolling_mean(self, cleanup_figures):
+        t = np.arange(5)
+        y = np.arange(5)
+        with pytest.raises(TypeError, match="rolling_mean"):
+            sp.plot_timeseries(t, y, rolling_mean="3")
+
+
+class TestSlopeHardening:
+    def test_plot_slope_rejects_non_finite_values(self, cleanup_figures):
+        with pytest.raises(ValueError, match="不能包含 NaN 或 Inf"):
+            sp.plot_slope(["A", "B"], [np.nan, 1.0], [2.0, 3.0])

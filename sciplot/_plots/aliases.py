@@ -161,11 +161,11 @@ def area(
 
 def multi(
     x,
-    ys: Sequence,
+    y_list: Sequence,
+    labels: Optional[Sequence[str]] = None,
     xlabel: str = "",
     ylabel: str = "",
     title: str = "",
-    labels: Optional[Sequence[str]] = None,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
     lang: Optional[str] = None,
@@ -174,7 +174,7 @@ def multi(
     """绘制多线折线图（plot_multi 的别名）"""
     return plot_multi(
         x,
-        ys,
+        y_list,
         labels=labels,
         xlabel=xlabel,
         ylabel=ylabel,
@@ -188,20 +188,22 @@ def multi(
 
 def multi_line(
     x,
-    ys: Sequence,
+    y_list: Sequence,
+    labels: Optional[Sequence[str]] = None,
     xlabel: str = "",
     ylabel: str = "",
     title: str = "",
-    labels: Optional[Sequence[str]] = None,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
     lang: Optional[str] = None,
+    use_linestyles: bool = False,
+    show_legend: bool = True,
     **kwargs,
 ) -> PlotResult:
     """绘制多线折线图（plot_multi_line 的别名）"""
     return plot_multi_line(
         x,
-        ys,
+        y_list,
         labels=labels,
         xlabel=xlabel,
         ylabel=ylabel,
@@ -209,19 +211,21 @@ def multi_line(
         venue=venue,
         palette=palette,
         lang=lang,
+        use_linestyles=use_linestyles,
+        show_legend=show_legend,
         **kwargs,
     )
 
 
 def multi_area(
     x,
-    ys: Sequence,
+    y_list: Sequence,
+    labels: Optional[Sequence[str]] = None,
     xlabel: str = "",
     ylabel: str = "",
     title: str = "",
-    labels: Optional[Sequence[str]] = None,
-    alpha: float = 0.3,
     stacked: bool = False,
+    alpha: float = 0.3,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
     lang: Optional[str] = None,
@@ -230,7 +234,7 @@ def multi_area(
     """绘制多系列面积图（plot_multi_area 的别名）"""
     return plot_multi_area(
         x,
-        ys,
+        y_list,
         labels=labels,
         xlabel=xlabel,
         ylabel=ylabel,
@@ -373,7 +377,7 @@ def hbar(
 
 
 def hist(
-    x,
+    data,
     bins: int = 30,
     xlabel: str = "",
     ylabel: str = "Frequency",
@@ -387,7 +391,7 @@ def hist(
 ) -> PlotResult:
     """绘制直方图（plot_histogram 的别名）"""
     return plot_histogram(
-        x,
+        data,
         bins=bins,
         xlabel=xlabel,
         ylabel=ylabel,

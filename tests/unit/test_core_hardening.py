@@ -4,7 +4,11 @@ Hardening tests for hidden edge cases in core modules.
 
 from __future__ import annotations
 
+import uuid
+from pathlib import Path
+
 import pytest
+import matplotlib.pyplot as plt
 
 import sciplot as sp
 
@@ -47,6 +51,36 @@ class TestConfigHardening:
         assert loaded is False
         assert sp.get_config("venue") == "nature"
         assert sp.get_config("formats") == ("pdf", "png")
+
+    def test_set_defaults_rejects_invalid_palette(self):
+        with pytest.raises(ValueError, match="palette"):
+            sp.set_defaults(palette="not-a-palette")
+
+    def test_set_defaults_rejects_invalid_formats(self):
+        with pytest.raises(ValueError, match="不支持的格式"):
+            sp.set_defaults(formats=["png", "badfmt"])
+
+    def test_load_config_rejects_invalid_palette_and_formats(self, temp_dir):
+        config_file = temp_dir / ".sciplot.toml"
+        config_file.write_text(
+            'palette = "not-a-palette"\nformats = ["png", "badfmt"]\n',
+            encoding="utf-8",
+        )
+
+        loaded = sp.load_config(config_file)
+        assert loaded is False
+        assert sp.get_config("palette") == "pastel"
+        assert sp.get_config("formats") == ("pdf", "png")
+
+    def test_load_config_expands_user_home_path(self):
+        config_file = Path.home() / f".sciplot-home-test-{uuid.uuid4().hex}.toml"
+        config_file.write_text('venue = "ieee"\n', encoding="utf-8")
+        try:
+            loaded = sp.load_config(f"~/{config_file.name}")
+            assert loaded is True
+            assert sp.get_config("venue") == "ieee"
+        finally:
+            config_file.unlink(missing_ok=True)
 
 
 class TestSaveHardening:
@@ -94,3 +128,55 @@ class TestPaletteDefensiveCopies:
 
         fresh = sp.get_palette("copy_test_palette")
         assert fresh == ["#111111", "#222222"]
+
+
+class TestColorUtilityHardening:
+    def test_rgb_to_hex_rejects_out_of_range(self):
+        with pytest.raises(ValueError, match="\\[0, 1\\]"):
+            sp.rgb_to_hex(1.2, 0.5, 0.5)
+        with pytest.raises(ValueError, match="\\[0, 1\\]"):
+            sp.rgb_to_hex(-0.1, 0.5, 0.5)
+
+    def test_lighten_color_rejects_invalid_amount(self):
+        with pytest.raises(ValueError, match="\\[0, 1\\]"):
+            sp.lighten_color("#123456", 2.0)
+
+    def test_darken_color_rejects_invalid_amount(self):
+        with pytest.raises(ValueError, match="\\[0, 1\\]"):
+            sp.darken_color("#123456", -1.0)
+
+    def test_hex_to_rgb_rejects_invalid_hex_chars(self):
+        with pytest.raises(ValueError, match="无效 HEX 颜色"):
+            sp.hex_to_rgb("#GGGGGG")
+
+    def test_generate_gradient_requires_integer_n(self):
+        with pytest.raises(ValueError, match="n 必须是整数"):
+            sp.generate_gradient("#000000", "#ffffff", 2.5)
+
+
+class TestSmartUtilityHardening:
+    def test_auto_rotate_labels_rejects_invalid_axis(self, cleanup_figures):
+        fig, ax = plt.subplots()
+        ax.plot([1, 2], [1, 2])
+        with pytest.raises(ValueError, match="axis"):
+            sp.auto_rotate_labels(ax, axis="z")
+
+    def test_smart_legend_rejects_non_positive_ncols(self, cleanup_figures):
+        fig, ax = plt.subplots()
+        ax.plot([1, 2], [1, 2], label="line")
+        with pytest.raises(ValueError, match="ncols"):
+            sp.smart_legend(ax, ncols=0)
+
+    def test_suggest_figsize_rejects_invalid_item_width(self):
+        with pytest.raises(ValueError, match="item_width"):
+            sp.suggest_figsize(10, item_width=0)
+
+    def test_suggest_figsize_rejects_invalid_height_ratio(self):
+        with pytest.raises(ValueError, match="height_ratio"):
+            sp.suggest_figsize(10, height_ratio=-1)
+
+    def test_check_color_contrast_rejects_invalid_threshold_and_hex(self):
+        with pytest.raises(ValueError, match="threshold"):
+            sp.check_color_contrast("#ffffff", "#000000", threshold=0)
+        with pytest.raises(ValueError, match="bg_color"):
+            sp.check_color_contrast("#ZZZ", "#000000")

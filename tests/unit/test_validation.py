@@ -172,6 +172,10 @@ class TestPlotBarValidation:
         with pytest.raises(ValueError, match="必须为正数"):
             sp.plot_bar(["A", "B"], np.array([1, 2]), width=0)
 
+    def test_non_finite_values_raise(self, cleanup_figures):
+        with pytest.raises(ValueError, match="NaN 或 Inf"):
+            sp.plot_bar(["A", "B"], np.array([1.0, np.nan]))
+
 
 class TestPlotGroupedBarValidation:
     """测试 plot_grouped_bar 输入验证"""
@@ -196,6 +200,96 @@ class TestPlotGroupedBarValidation:
         with pytest.raises(ValueError, match="必须为正数"):
             sp.plot_grouped_bar(["A", "B"], {"S": [1, 2]}, width=0)
 
+    def test_width_gap_relation_raises(self, cleanup_figures):
+        """测试 width 与 gap 组合导致柱宽非正时报错"""
+        with pytest.raises(ValueError, match="宽度将小于等于 0"):
+            sp.plot_grouped_bar(
+                ["A", "B"],
+                {"S1": [1, 2], "S2": [2, 3], "S3": [3, 4]},
+                width=0.1,
+                gap=0.1,
+            )
+
+    def test_non_finite_series_raises(self, cleanup_figures):
+        with pytest.raises(ValueError, match="NaN 或 Inf"):
+            sp.plot_grouped_bar(["A", "B"], {"S1": [1.0, np.nan]})
+
+
+class TestPlotStackedBarValidation:
+    """测试 plot_stacked_bar 输入验证"""
+
+    def test_empty_categories_raises(self, cleanup_figures):
+        with pytest.raises(ValueError, match="不能为空列表"):
+            sp.plot_stacked_bar([], {"A": [1, 2]})
+
+    def test_empty_data_raises(self, cleanup_figures):
+        with pytest.raises(ValueError, match="不能为空字典"):
+            sp.plot_stacked_bar(["A", "B"], {})
+
+    def test_data_length_mismatch_raises(self, cleanup_figures):
+        with pytest.raises(ValueError, match="长度.*不一致"):
+            sp.plot_stacked_bar(["A", "B"], {"Series": [1]})
+
+    def test_non_finite_series_raises(self, cleanup_figures):
+        with pytest.raises(ValueError, match="NaN 或 Inf"):
+            sp.plot_stacked_bar(["A", "B"], {"Series": [1.0, np.nan]})
+
+
+class TestPlotHorizontalBarValidation:
+    """测试 plot_horizontal_bar 输入验证"""
+
+    def test_empty_categories_raises(self, cleanup_figures):
+        with pytest.raises(ValueError, match="不能为空列表"):
+            sp.plot_horizontal_bar([], [])
+
+    def test_length_mismatch_raises(self, cleanup_figures):
+        with pytest.raises(ValueError, match="长度.*不一致"):
+            sp.plot_horizontal_bar(["A", "B"], [1.0])
+
+
+class TestPlotHistogramValidation:
+    """测试 plot_histogram 输入验证"""
+
+    def test_empty_data_raises(self, cleanup_figures):
+        with pytest.raises(ValueError, match="至少需要 1 个有限数值"):
+            sp.plot_histogram(np.array([]))
+
+    def test_all_nan_data_raises(self, cleanup_figures):
+        with pytest.raises(ValueError, match="至少需要 1 个有限数值"):
+            sp.plot_histogram(np.array([np.nan, np.nan]))
+
+
+class TestPlotComboValidation:
+    """测试 plot_combo 输入验证"""
+
+    def test_invalid_bar_width_raises(self, cleanup_figures):
+        with pytest.raises(ValueError, match="bar_width"):
+            sp.plot_combo(["A", "B"], bar_data={"S1": [1, 2]}, bar_width=0)
+
+    def test_bar_data_non_finite_raises(self, cleanup_figures):
+        with pytest.raises(ValueError, match="NaN 或 Inf"):
+            sp.plot_combo(["A", "B"], bar_data={"S1": [1.0, np.nan]})
+
+    def test_line_data_non_finite_raises(self, cleanup_figures):
+        with pytest.raises(ValueError, match="NaN 或 Inf"):
+            sp.plot_combo(
+                ["A", "B"],
+                bar_data={"S1": [1.0, 2.0]},
+                line_data={"L1": [np.nan, 1.0]},
+            )
+
+
+class TestPlotBoxValidation:
+    def test_empty_data_raises(self, cleanup_figures):
+        with pytest.raises(ValueError, match="不能为空列表"):
+            sp.plot_box([])
+
+
+class TestPlotLollipopValidation:
+    def test_non_finite_values_raise(self, cleanup_figures):
+        with pytest.raises(ValueError, match="NaN 或 Inf"):
+            sp.plot_lollipop(["A", "B"], np.array([1.0, np.nan]))
+
 
 class TestPlotMultiLineValidation:
     """测试 plot_multi_line 输入验证"""
@@ -214,3 +308,29 @@ class TestPlotMultiLineValidation:
         fig, ax = sp.plot_multi_line(x, y_list)
         assert fig is not None
         assert ax is not None
+
+    def test_empty_y_list_raises(self, cleanup_figures):
+        x = np.linspace(0, 10, 100)
+        with pytest.raises(ValueError, match="y_list"):
+            sp.plot_multi_line(x, [])
+
+
+class TestPlotMultiValidation:
+    def test_empty_y_list_raises(self, cleanup_figures):
+        x = np.linspace(0, 10, 100)
+        with pytest.raises(ValueError, match="y_list"):
+            sp.plot_multi(x, [])
+
+
+class TestPlotMultiAreaValidation:
+    def test_empty_y_list_raises(self, cleanup_figures):
+        x = np.linspace(0, 10, 100)
+        with pytest.raises(ValueError, match="y_list"):
+            sp.plot_multi_area(x, [])
+
+
+class TestPlotMultiTimeseriesValidation:
+    def test_empty_y_list_raises(self, cleanup_figures):
+        t = np.arange(10)
+        with pytest.raises(ValueError, match="y_list"):
+            sp.plot_multi_timeseries(t, [])

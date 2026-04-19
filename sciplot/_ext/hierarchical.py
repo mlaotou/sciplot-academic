@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from typing import Any, List, Optional, Union
+import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,25 +21,32 @@ from sciplot._core.utils import apply_resolved_style
 from sciplot._core.result import PlotResult
 
 
+def _try_import_scipy():
+    """尝试导入 scipy.cluster.hierarchy，失败时返回 None。"""
+    try:
+        from scipy.cluster import hierarchy
+        return hierarchy
+    except ImportError:
+        return None
+
+
 def _check_scipy():
     """
     检查 scipy 是否可用
     
     返回:
-        (hierarchy, distance) 模块对象
+        hierarchy 模块对象
     
     抛出:
         ImportError: 未安装 scipy 时
     """
-    try:
-        from scipy.cluster import hierarchy
-        from scipy.spatial import distance
-        return hierarchy, distance
-    except ImportError as e:
-        raise ImportError(
-            "层次聚类功能需要安装 scipy。\n"
-            "请运行: uv add scipy 或 pip install scipy"
-        ) from e
+    hierarchy = _try_import_scipy()
+    if hierarchy is not None:
+        return hierarchy
+    raise ImportError(
+        "层次聚类功能需要安装 scipy。\n"
+        "请运行: uv add scipy 或 pip install scipy"
+    )
 
 
 def plot_dendrogram(
@@ -84,7 +92,7 @@ def plot_dendrogram(
         >>> result = sp.plot_dendrogram(Z, labels=[f"样本{i}" for i in range(20)])
         >>> result.save("dendrogram")
     """
-    hierarchy, distance = _check_scipy()
+    hierarchy = _check_scipy()
 
     effective_venue = apply_resolved_style(venue, palette)
     fig, ax = new_figure(effective_venue)
@@ -170,8 +178,6 @@ def plot_clustermap(
         >>> result = sp.plot_clustermap(data, row_cluster=True, col_cluster=True)
         >>> result.save("clustermap")
     """
-    hierarchy, distance = _check_scipy()
-
     effective_venue = apply_resolved_style(venue, palette)
     _, base_figsize, _ = VENUES.get(effective_venue or "nature", VENUES["nature"])
     heatmap_scale = max(base_figsize)
@@ -195,6 +201,18 @@ def plot_clustermap(
     # scipy linkage 需要至少 2 个观测值；单行/单列时自动跳过对应聚类。
     row_cluster = row_cluster and n_rows > 1
     col_cluster = col_cluster and n_cols > 1
+
+    hierarchy = None
+    if row_cluster or col_cluster:
+        hierarchy = _try_import_scipy()
+        if hierarchy is None:
+            warnings.warn(
+                "未检测到 scipy，plot_clustermap 已降级为普通热力图（跳过层次聚类）。",
+                UserWarning,
+                stacklevel=2,
+            )
+            row_cluster = False
+            col_cluster = False
 
     if row_cluster:
         row_Z = hierarchy.linkage(data, method='ward')

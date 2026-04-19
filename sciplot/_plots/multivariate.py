@@ -193,14 +193,27 @@ def plot_parallel(
     ax.set_xticklabels(columns, rotation=45, ha="right")
     ax.set_xlim(-0.5, n_features - 0.5)
 
-    if normalize == "none":
-        y_min, y_max = data_norm.min(), data_norm.max()
+    finite_values = data_norm[np.isfinite(data_norm)]
+    if finite_values.size == 0:
+        raise ValueError("data 中不包含可用于绘图的有限数值")
+
+    if normalize == "minmax":
+        ax.set_ylim(-0.05, 1.05)
+        y_label = "归一化值"
+    elif normalize == "zscore":
+        y_min = float(finite_values.min())
+        y_max = float(finite_values.max())
         y_margin = (y_max - y_min) * 0.05 if y_max > y_min else 0.5
         ax.set_ylim(y_min - y_margin, y_max + y_margin)
+        y_label = "标准化值 (Z-score)"
     else:
-        ax.set_ylim(-0.05, 1.05)
+        y_min = float(finite_values.min())
+        y_max = float(finite_values.max())
+        y_margin = (y_max - y_min) * 0.05 if y_max > y_min else 0.5
+        ax.set_ylim(y_min - y_margin, y_max + y_margin)
+        y_label = "原始值"
 
-    ax.set_ylabel("归一化值" if normalize != "none" else "原始值")
+    ax.set_ylabel(y_label)
     if title:
         ax.set_title(title)
     ax.tick_params(direction="in")

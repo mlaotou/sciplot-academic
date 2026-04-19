@@ -25,9 +25,11 @@ import threading
 import warnings
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
+from matplotlib.figure import Figure
 
 _CONFIG_LOCK = threading.Lock()
 _TOML_IMPORT_WARNED = False
+_SUPPORTED_SAVE_FORMATS = frozenset(Figure().canvas.get_supported_filetypes().keys())
 
 
 def _load_toml_module():
@@ -67,12 +69,22 @@ def _normalize_formats(formats: Union[Tuple[str, ...], list]) -> Tuple[str, ...]
     normalized = tuple(formats)
     if not normalized:
         raise ValueError("配置项 'formats' 不能为空")
+    result = []
     for fmt in normalized:
         if not isinstance(fmt, str) or not fmt.strip():
             raise ValueError(
                 "配置项 'formats' 必须是非空字符串序列"
             )
-    return tuple(fmt.strip().lower() for fmt in normalized)
+        canonical = fmt.strip().lower()
+        if canonical.startswith("."):
+            canonical = canonical[1:]
+        if canonical not in _SUPPORTED_SAVE_FORMATS:
+            raise ValueError(
+                f"配置项 'formats' 包含不支持的格式: {fmt!r}。"
+                f"可用格式: {sorted(_SUPPORTED_SAVE_FORMATS)}"
+            )
+        result.append(canonical)
+    return tuple(result)
 
 
 def _normalize_config_value(key: str, value: Any) -> Any:
@@ -90,6 +102,15 @@ def _normalize_config_value(key: str, value: Any) -> Any:
         if value not in VENUES:
             raise ValueError(
                 f"配置项 'venue' 取值无效: {value!r}，可用选项: {list(VENUES.keys())}"
+            )
+        return value
+
+    if key == "palette":
+        from sciplot._core.palette import list_palettes
+        available_palettes = list_palettes()
+        if value not in available_palettes:
+            raise ValueError(
+                f"配置项 'palette' 取值无效: {value!r}，可用选项: {available_palettes}"
             )
         return value
 
@@ -236,7 +257,7 @@ class SciPlotConfig:
             >>> sp.load_config("path/to/config.toml")  # 指定路径
         """
         if path is not None:
-            config_path = Path(path)
+            config_path = Path(path).expanduser()
             if not config_path.exists():
                 raise FileNotFoundError(f"配置文件不存在: {config_path}")
             return cls._load_config_file(config_path)

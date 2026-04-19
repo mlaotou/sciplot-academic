@@ -84,6 +84,17 @@ class TestFluentInterface:
         assert isinstance(result, FigureWrapper)
         assert isinstance(result.get_figure(), Figure)
 
+    def test_chain_mutators_after_plot_raise(self, test_data, cleanup_figures):
+        chain = sp.chain(venue="nature", palette="pastel", lang="en")
+        chain.plot(test_data["x"], test_data["y"])
+
+        with pytest.raises(RuntimeError):
+            chain.style("ieee")
+        with pytest.raises(RuntimeError):
+            chain.palette("ocean")
+        with pytest.raises(RuntimeError):
+            chain.lang("zh")
+
 
 class TestContextManager:
     """测试 Context Manager 上下文管理器"""
@@ -241,3 +252,41 @@ class TestAliasParameters:
         sig1 = inspect.signature(sp.plot_scatter)
         sig2 = inspect.signature(sp.scatter)
         assert list(sig1.parameters.keys()) == list(sig2.parameters.keys())
+
+    def test_multi_parameters_match(self, test_data):
+        """测试 multi 和 plot_multi 参数一致"""
+        import inspect
+        sig1 = inspect.signature(sp.plot_multi)
+        sig2 = inspect.signature(sp.multi)
+        assert list(sig1.parameters.keys()) == list(sig2.parameters.keys())
+
+    def test_multi_line_parameters_match(self, test_data):
+        """测试 multi_line 和 plot_multi_line 参数一致"""
+        import inspect
+        sig1 = inspect.signature(sp.plot_multi_line)
+        sig2 = inspect.signature(sp.multi_line)
+        assert list(sig1.parameters.keys()) == list(sig2.parameters.keys())
+
+    def test_multi_area_parameters_match(self, test_data):
+        """测试 multi_area 和 plot_multi_area 参数一致"""
+        import inspect
+        sig1 = inspect.signature(sp.plot_multi_area)
+        sig2 = inspect.signature(sp.multi_area)
+        assert list(sig1.parameters.keys()) == list(sig2.parameters.keys())
+
+    def test_hist_parameters_match(self, test_data):
+        """测试 hist 和 plot_histogram 参数一致"""
+        import inspect
+        sig1 = inspect.signature(sp.plot_histogram)
+        sig2 = inspect.signature(sp.hist)
+        assert list(sig1.parameters.keys()) == list(sig2.parameters.keys())
+
+    def test_multi_positional_labels_semantics(self, cleanup_figures):
+        """位置参数第 3 个应解释为 labels，而不是 xlabel。"""
+        x = np.linspace(0, 1, 20)
+        y1 = x
+        y2 = x**2
+
+        result = sp.multi(x, [y1, y2], ["A", "B"])
+        _, labels = result.ax.get_legend_handles_labels()
+        assert labels == ["A", "B"]

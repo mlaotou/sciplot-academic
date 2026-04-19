@@ -5,11 +5,15 @@
 from __future__ import annotations
 
 from typing import List, Optional, Tuple
+import math
+import re
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+
+_HEX_PATTERN = re.compile(r"^[0-9A-Fa-f]{3}$|^[0-9A-Fa-f]{6}$")
 
 
 def auto_rotate_labels(
@@ -32,6 +36,9 @@ def auto_rotate_labels(
         >>> fig, ax = sp.plot_bar(categories, values)
         >>> sp.auto_rotate_labels(ax)  # 自动检测并旋转 X 轴标签
     """
+    if axis not in {"x", "y"}:
+        raise ValueError(f"axis 必须是 'x' 或 'y'，实际值: {axis!r}")
+
     try:
         ax.figure.canvas.draw()
     except Exception:
@@ -87,6 +94,10 @@ def smart_legend(
 
     if not handles:
         return
+
+    if ncols is not None:
+        if not isinstance(ncols, int) or ncols <= 0:
+            raise ValueError(f"ncols 必须是正整数或 None，实际值: {ncols!r}")
 
     # 自动计算列数
     if ncols is None:
@@ -175,6 +186,21 @@ def suggest_figsize(
         >>> figsize = sp.suggest_figsize(20, item_width=0.4)
         >>> fig, ax = plt.subplots(figsize=figsize)
     """
+    if not isinstance(n_items, int) or n_items < 0:
+        raise ValueError(f"n_items 必须是非负整数，实际值: {n_items!r}")
+    if item_width <= 0:
+        raise ValueError(f"item_width 必须为正数，实际值: {item_width!r}")
+    if min_width <= 0 or max_width <= 0:
+        raise ValueError(
+            f"min_width 和 max_width 必须为正数，实际值: min_width={min_width!r}, max_width={max_width!r}"
+        )
+    if max_width < min_width:
+        raise ValueError(
+            f"max_width 必须大于等于 min_width，实际值: min_width={min_width!r}, max_width={max_width!r}"
+        )
+    if height_ratio <= 0:
+        raise ValueError(f"height_ratio 必须为正数，实际值: {height_ratio!r}")
+
     width = max(min_width, min(max_width, n_items * item_width))
     height = width * height_ratio
     return width, height
@@ -200,10 +226,21 @@ def check_color_contrast(
         >>> passed, ratio = sp.check_color_contrast("#FFFFFF", "#000000")
         >>> print(f"对比度: {ratio:.2f}, 通过: {passed}")
     """
-    def _luminance(hex_color: str) -> float:
-        h = hex_color.lstrip("#")
+    if not isinstance(threshold, (int, float)) or not math.isfinite(float(threshold)) or threshold <= 0:
+        raise ValueError(f"threshold 必须是正数，实际值: {threshold!r}")
+
+    def _normalize_hex(hex_color: str, name: str) -> str:
+        if not isinstance(hex_color, str) or not hex_color.strip():
+            raise ValueError(f"{name} 必须是 HEX 颜色字符串，实际值: {hex_color!r}")
+        h = hex_color.strip().lstrip("#")
+        if not _HEX_PATTERN.fullmatch(h):
+            raise ValueError(f"{name} 不是合法 HEX 颜色: {hex_color!r}")
         if len(h) == 3:
             h = "".join(c * 2 for c in h)
+        return h
+
+    def _luminance(hex_color: str) -> float:
+        h = _normalize_hex(hex_color, "颜色")
         r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
 
         # 转换为 sRGB
@@ -216,8 +253,10 @@ def check_color_contrast(
         r, g, b = _correct(r), _correct(g), _correct(b)
         return 0.2126 * r + 0.7152 * g + 0.0722 * b
 
-    L1 = _luminance(bg_color)
-    L2 = _luminance(fg_color)
+    bg_hex = _normalize_hex(bg_color, "bg_color")
+    fg_hex = _normalize_hex(fg_color, "fg_color")
+    L1 = _luminance(bg_hex)
+    L2 = _luminance(fg_hex)
 
     lighter = max(L1, L2)
     darker = min(L1, L2)

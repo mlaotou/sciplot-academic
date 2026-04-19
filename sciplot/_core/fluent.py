@@ -80,6 +80,11 @@ class PlotChain:
         示例:
             >>> sp.style("nature").plot(x, y)
         """
+        if self._fig is not None:
+            raise RuntimeError(
+                "style() 必须在调用任何绘图方法之前设置。"
+                "当前图形已创建，无法在同一链中切换样式。"
+            )
         self._venue = venue
         self._style_applied = False
         return self
@@ -97,6 +102,11 @@ class PlotChain:
         示例:
             >>> sp.palette("earth").plot(x, y)
         """
+        if self._fig is not None:
+            raise RuntimeError(
+                "palette() 必须在调用任何绘图方法之前设置。"
+                "当前图形已创建，无法在同一链中切换配色。"
+            )
         self._palette = palette
         self._style_applied = False
         return self
@@ -111,6 +121,11 @@ class PlotChain:
         返回:
             self 支持链式调用
         """
+        if self._fig is not None:
+            raise RuntimeError(
+                "lang() 必须在调用任何绘图方法之前设置。"
+                "当前图形已创建，无法在同一链中切换语言。"
+            )
         self._lang = lang
         self._style_applied = False
         return self

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import warnings
 from typing import Any, List, Optional
+from statistics import NormalDist
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,16 +20,56 @@ from sciplot._core.utils import apply_resolved_style
 from sciplot._core.result import PlotResult
 
 
-def _check_scipy_stats():
-    """检查 scipy.stats 可用性并返回模块对象。"""
+def _try_import_scipy_stats():
+    """尝试导入 scipy.stats，失败时返回 None。"""
     try:
         from scipy import stats
         return stats
-    except ImportError as e:
-        raise ImportError(
-            "统计图表功能需要安装 scipy。\n"
-            "请运行: pip install scipy 或 pip install sciplot-academic[statistical]"
-        ) from e
+    except ImportError:
+        return None
+
+
+def _check_scipy_stats():
+    """检查 scipy.stats 可用性并返回模块对象。"""
+    stats = _try_import_scipy_stats()
+    if stats is not None:
+        return stats
+    raise ImportError(
+        "统计图表功能需要安装 scipy。\n"
+        "请运行: pip install scipy 或 pip install sciplot-academic[statistical]"
+    )
+
+
+def _theoretical_quantiles_without_scipy(
+    n_points: int,
+    distribution: str,
+) -> np.ndarray:
+    """在未安装 scipy 时生成常见分布的理论分位数。"""
+    probs = (np.arange(1, n_points + 1) - 0.5) / n_points
+
+    if distribution == "norm":
+        return np.array([NormalDist().inv_cdf(float(p)) for p in probs], dtype=float)
+
+    if distribution == "expon":
+        return -np.log1p(-probs)
+
+    if distribution == "uniform":
+        return probs
+
+    if distribution == "t":
+        # df=10 的 Cornish-Fisher 近似，兼顾精度与无 scipy 兼容性。
+        df = 10.0
+        z = np.array([NormalDist().inv_cdf(float(p)) for p in probs], dtype=float)
+        z2 = z * z
+        z3 = z2 * z
+        z5 = z3 * z2
+        return (
+            z
+            + (z3 + z) / (4.0 * df)
+            + (5.0 * z5 + 16.0 * z3 + 3.0 * z) / (96.0 * df * df)
+        )
+
+    raise ValueError(f"未知分布: {distribution}")
 
 
 def plot_residuals(
@@ -139,7 +180,7 @@ def plot_qq(
         >>> data = np.random.normal(0, 1, 100)
         >>> fig, ax = sp.plot_qq(data, title="正态性检验")
     """
-    stats = _check_scipy_stats()
+    stats = _try_import_scipy_stats()
 
     data = np.asarray(data, dtype=float)
     data = data[np.isfinite(data)]
@@ -147,16 +188,11 @@ def plot_qq(
     if len(data) < 3:
         raise ValueError("数据点太少，至少需要 3 个有效值")
 
-    dist_map = {
-        "norm": (stats.norm, ()),
-        "expon": (stats.expon, ()),
-        "uniform": (stats.uniform, ()),
-        "t": (stats.t, (10,)),
-    }
+    dist_map = {"norm", "expon", "uniform", "t"}
 
     if distribution not in dist_map:
         raise ValueError(
-            f"未知分布: {distribution}。可选: {list(dist_map.keys())}"
+            f"未知分布: {distribution}。可选: {sorted(dist_map)}"
         )
 
     effective_venue = apply_resolved_style(venue, palette, lang)
@@ -164,13 +200,29 @@ def plot_qq(
 
     colors = [c["color"] for c in plt.rcParams["axes.prop_cycle"]]
 
-    dist_obj, sparams = dist_map[distribution]
-    (osm, osr), (slope, intercept, _r) = stats.probplot(
-        data,
-        dist=dist_obj,
-        sparams=sparams,
-        plot=None,
-    )
+    if stats is not None:
+        scipy_dist_map = {
+            "norm": (stats.norm, ()),
+            "expon": (stats.expon, ()),
+            "uniform": (stats.uniform, ()),
+            "t": (stats.t, (10,)),
+        }
+        dist_obj, sparams = scipy_dist_map[distribution]
+        (osm, osr), (slope, intercept, _r) = stats.probplot(
+            data,
+            dist=dist_obj,
+            sparams=sparams,
+            plot=None,
+        )
+    else:
+        warnings.warn(
+            "未安装 scipy，plot_qq 使用近似分位数计算。",
+            UserWarning,
+            stacklevel=2,
+        )
+        osr = np.sort(data)
+        osm = _theoretical_quantiles_without_scipy(len(osr), distribution)
+        slope, intercept = np.polyfit(osm, osr, 1)
 
     ax.scatter(osm, osr, alpha=0.6, color=colors[0], **kwargs)
 

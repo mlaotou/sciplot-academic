@@ -142,7 +142,12 @@ def create_subplots(
         >>> axes[0, 0].plot(x, y)
     """
     from sciplot._core.style import setup_style
-    setup_style(venue, palette or "pastel", lang or "zh")
+    from sciplot._core.style import get_current_lang, VALID_LANGS
+    current_lang = get_current_lang()
+    effective_lang = lang if lang is not None else (
+        current_lang if current_lang in VALID_LANGS else "zh"
+    )
+    setup_style(venue, palette or "pastel", effective_lang)
 
     _, base_figsize, _ = VENUES[venue]
     figsize = (base_figsize[0] * ncols * 0.85, base_figsize[1] * nrows * 0.85)
@@ -188,7 +193,12 @@ def paper_subplots(
         >>> fig, axes = sp.paper_subplots(2, 2, venue="ieee")
     """
     from sciplot._core.style import setup_style
-    setup_style(venue, palette or "pastel", lang or "zh")
+    from sciplot._core.style import get_current_lang, VALID_LANGS
+    current_lang = get_current_lang()
+    effective_lang = lang if lang is not None else (
+        current_lang if current_lang in VALID_LANGS else "zh"
+    )
+    setup_style(venue, palette or "pastel", effective_lang)
 
     if figsize is not None:
         final_figsize = figsize
@@ -234,7 +244,12 @@ def create_gridspec(
     """
     from sciplot._core.style import setup_style
     from sciplot._core.result import GridSpecResult
-    setup_style(venue, palette or "pastel", lang or "zh")
+    from sciplot._core.style import get_current_lang, VALID_LANGS
+    current_lang = get_current_lang()
+    effective_lang = lang if lang is not None else (
+        current_lang if current_lang in VALID_LANGS else "zh"
+    )
+    setup_style(venue, palette or "pastel", effective_lang)
     _, figsize, _ = VENUES[venue]
     fig = plt.figure(figsize=figsize)
     gs = GridSpec(nrows, ncols, figure=fig, **kwargs)
@@ -427,6 +442,17 @@ def save(
     """
     VECTOR_FORMATS = {"pdf", "svg", "eps"}
     normalized_formats = _normalize_output_formats(formats)
+
+    supported_formats = set(fig.canvas.get_supported_filetypes().keys())
+    invalid_formats = [fmt for fmt in normalized_formats if fmt not in supported_formats]
+    if invalid_formats:
+        raise ValueError(
+            f"不支持的输出格式: {invalid_formats}。可用格式: {sorted(supported_formats)}"
+        )
+
+    if any(fmt not in VECTOR_FORMATS for fmt in normalized_formats):
+        if not isinstance(dpi, (int, float)) or dpi <= 0:
+            raise ValueError(f"dpi 必须为正数，实际值: {dpi!r}")
 
     # 处理 name 可能包含路径的情况
     name_path = Path(name)

@@ -190,3 +190,27 @@ class TestVenueLayouts:
             assert 2.0 <= height <= 8.0
             # 宽高比应该合理
             assert 0.5 <= height / width <= 2.0
+
+
+class TestSaveHardening:
+    """测试 save 的前置校验，避免部分写入。"""
+
+    def test_save_invalid_format_fails_fast(self, temp_dir, cleanup_figures):
+        fig, ax = sp.plot([1, 2], [1, 2])
+        output_stem = temp_dir / "invalid_format_case"
+
+        with pytest.raises(ValueError, match="不支持的输出格式"):
+            sp.save(fig, output_stem, formats=("png", "badfmt"))
+
+        assert not (temp_dir / "invalid_format_case.png").exists()
+        assert not (temp_dir / "invalid_format_case.badfmt").exists()
+
+    def test_save_invalid_dpi_fails_fast_for_mixed_formats(self, temp_dir, cleanup_figures):
+        fig, ax = sp.plot([1, 2], [1, 2])
+        output_stem = temp_dir / "invalid_dpi_case"
+
+        with pytest.raises(ValueError, match="dpi 必须为正数"):
+            sp.save(fig, output_stem, formats=("pdf", "png"), dpi=0)
+
+        assert not (temp_dir / "invalid_dpi_case.pdf").exists()
+        assert not (temp_dir / "invalid_dpi_case.png").exists()

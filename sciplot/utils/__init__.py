@@ -4,7 +4,29 @@
 
 from __future__ import annotations
 
+import math
+import re
 from typing import List, Tuple
+
+_HEX_PATTERN = re.compile(r"^[0-9A-Fa-f]{3}$|^[0-9A-Fa-f]{6}$")
+
+
+def _validate_unit_value(value: float, name: str) -> float:
+    """校验 0-1 区间的浮点输入。"""
+    try:
+        val = float(value)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"{name} 必须是数值，实际值: {value!r}") from e
+    if not math.isfinite(val):
+        raise ValueError(f"{name} 必须是有限数值，实际值: {value!r}")
+    if not (0.0 <= val <= 1.0):
+        raise ValueError(f"{name} 必须在 [0, 1] 区间，实际值: {val}")
+    return val
+
+
+def _validate_amount(amount: float, name: str = "amount") -> float:
+    """校验颜色调整幅度参数。"""
+    return _validate_unit_value(amount, name)
 
 
 # ============================================================================
@@ -19,10 +41,13 @@ def hex_to_rgb(hex_color: str) -> Tuple[float, float, float]:
         >>> hex_to_rgb("#cdb4db")
         (0.804, 0.706, 0.859)
     """
-    h = hex_color.lstrip("#")
+    if not isinstance(hex_color, str) or not hex_color.strip():
+        raise ValueError(f"无效 HEX 颜色: {hex_color!r}")
+
+    h = hex_color.strip().lstrip("#")
     if len(h) == 3:
         h = "".join(c * 2 for c in h)
-    if len(h) != 6:
+    if not _HEX_PATTERN.fullmatch(h):
         raise ValueError(f"无效 HEX 颜色: '{hex_color}'")
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
     return r / 255.0, g / 255.0, b / 255.0
@@ -36,6 +61,9 @@ def rgb_to_hex(r: float, g: float, b: float) -> str:
         >>> rgb_to_hex(0.8, 0.5, 0.3)
         '#cc7f4d'
     """
+    r = _validate_unit_value(r, "r")
+    g = _validate_unit_value(g, "g")
+    b = _validate_unit_value(b, "b")
     return "#{:02x}{:02x}{:02x}".format(
         int(r * 255), int(g * 255), int(b * 255)
     )
@@ -53,6 +81,7 @@ def lighten_color(hex_color: str, amount: float = 0.3) -> str:
         >>> lighten_color("#264653", 0.4)
         '#6f8b96'
     """
+    amount = _validate_amount(amount)
     r, g, b = hex_to_rgb(hex_color)
     r = r + (1 - r) * amount
     g = g + (1 - g) * amount
@@ -72,6 +101,7 @@ def darken_color(hex_color: str, amount: float = 0.3) -> str:
         >>> darken_color("#cdb4db", 0.3)
         '#906f9a'
     """
+    amount = _validate_amount(amount)
     r, g, b = hex_to_rgb(hex_color)
     r = r * (1 - amount)
     g = g * (1 - amount)
@@ -96,6 +126,8 @@ def generate_gradient(
         >>> colors = generate_gradient("#cdb4db", "#264653", 5)
         >>> sp.set_custom_palette(colors, name="custom_grad")
     """
+    if not isinstance(n, int):
+        raise ValueError(f"n 必须是整数，实际值: {n!r}")
     if n < 2:
         raise ValueError("n 至少为 2")
     r1, g1, b1 = hex_to_rgb(start)

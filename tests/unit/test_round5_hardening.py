@@ -43,6 +43,31 @@ def test_combo_returns_combo_plot_result(cleanup_figures):
     assert ax_line is not None
 
 
+def test_distribution_aliases_accept_lang(cleanup_figures):
+    """grouped_bar/stacked_bar/combo 别名应支持 lang 参数。"""
+    grouped = sp.grouped_bar(
+        groups=["A", "B"],
+        data={"M1": [1.0, 2.0], "M2": [1.5, 2.2]},
+        lang="en",
+    )
+    assert isinstance(grouped, sp.PlotResult)
+
+    stacked = sp.stacked_bar(
+        categories=["A", "B"],
+        data={"M1": [1.0, 2.0], "M2": [0.5, 0.8]},
+        lang="en",
+    )
+    assert isinstance(stacked, sp.PlotResult)
+
+    combo = sp.combo(
+        x=["Q1", "Q2"],
+        bar_data={"销量": [10, 12]},
+        line_data={"增长率": [0.1, 0.2]},
+        lang="en",
+    )
+    assert isinstance(combo, sp.ComboPlotResult)
+
+
 def test_plot_parallel_show_colorbar_false(cleanup_figures):
     """连续着色下可关闭 colorbar 以保持版心尺寸。"""
     data = np.random.randn(30, 4)
@@ -78,6 +103,17 @@ def test_plot_lollipop_basic(cleanup_figures):
     """棒棒糖图应可正常返回 PlotResult。"""
     result = sp.plot_lollipop(["A", "B", "C"], np.array([2.0, 3.5, 1.2]))
     assert isinstance(result, sp.PlotResult)
+
+
+def test_plot_multi_area_applies_kwargs_in_non_stacked_mode(cleanup_figures):
+    """multi_area 非堆叠模式应透传 fill_between kwargs。"""
+    x = np.arange(5)
+    ys = [np.array([1, 2, 3, 2, 1]), np.array([2, 3, 4, 3, 2])]
+    result = sp.plot_multi_area(x, ys, stacked=False, linewidth=2.5, edgecolor="black")
+
+    assert len(result.ax.collections) == 2
+    line_widths = [coll.get_linewidths()[0] for coll in result.ax.collections]
+    assert all(lw == pytest.approx(2.5, rel=1e-3, abs=1e-3) for lw in line_widths)
 
 
 def test_plot_density_and_multi_density(cleanup_figures):

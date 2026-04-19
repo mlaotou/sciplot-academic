@@ -87,9 +87,6 @@ def setup_style(
         >>> sp.setup_style("thesis", "100yuan")       # 学位论文 + 人民币红
         >>> sp.setup_style(lang="en")                 # 英文模式
     """
-    # 使用线程安全的上下文变量设置语言
-    set_current_lang(lang)
-
     if venue not in VENUES:
         raise ValueError(
             f"未知 venue '{venue}'，可用选项: {list(VENUES.keys())}"
@@ -112,6 +109,9 @@ def setup_style(
             cjk_font = None
         else:
             cjk_font = main_font
+
+    # 参数全部验证通过后再更新全局语言状态，避免异常路径污染状态。
+    set_current_lang(lang)
 
     # ── 重置并应用样式（优先 SciencePlots，缺失时自动降级） ──
     plt.rcdefaults()

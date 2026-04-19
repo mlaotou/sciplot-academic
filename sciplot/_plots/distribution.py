@@ -58,11 +58,13 @@ def plot_bar(
     # 输入验证
     if not categories:
         raise ValueError("参数 'categories' 不能为空列表")
-    values = validate_array_like(values, "values")
+    values = np.asarray(validate_array_like(values, "values"), dtype=float)
     if len(categories) != len(values):
         raise ValueError(
             f"categories 长度 ({len(categories)}) 与 values 长度 ({len(values)}) 不一致"
         )
+    if not np.all(np.isfinite(values)):
+        raise ValueError("values 不能包含 NaN 或 Inf")
     width = validate_positive_number(width, "width", allow_zero=False)
 
     effective_venue = apply_resolved_style(venue, palette, lang)
@@ -95,6 +97,7 @@ def plot_grouped_bar(
     legend_loc: str = "best",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -109,6 +112,7 @@ def plot_grouped_bar(
         show_values: True 则在柱顶显示数值
         value_fmt  : 数值格式字符串，默认 ".1f"
         legend_loc : 图例位置
+        lang       : 语言设置
 
     示例:
         >>> methods = {"ResNet": [82.3, 84.1, 86.5],
@@ -127,24 +131,34 @@ def plot_grouped_bar(
         raise ValueError("参数 'groups' 不能为空列表")
     data = validate_dict_not_empty(data, "data")
     n_groups = len(groups)
+    normalized_data: Dict[str, np.ndarray] = {}
     for series_name, values in data.items():
-        if len(values) != n_groups:
+        values_arr = np.asarray(values, dtype=float).ravel()
+        if len(values_arr) != n_groups:
             raise ValueError(
-                f"数据系列 '{series_name}' 的长度 ({len(values)}) "
+                f"数据系列 '{series_name}' 的长度 ({len(values_arr)}) "
                 f"与 groups 长度 ({n_groups}) 不一致"
             )
+        if not np.all(np.isfinite(values_arr)):
+            raise ValueError(f"数据系列 '{series_name}' 不能包含 NaN 或 Inf")
+        normalized_data[series_name] = values_arr
     width = validate_positive_number(width, "width", allow_zero=False)
     gap = validate_positive_number(gap, "gap", allow_zero=True)
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     colors = _get_cycle_colors()
 
-    n_series = len(data)
+    n_series = len(normalized_data)
+    if width <= gap * (n_series - 1):
+        raise ValueError(
+            f"width={width} 过小，必须大于 gap*(系列数-1)={gap * (n_series - 1):.6g}，"
+            "否则每个柱子的宽度将小于等于 0"
+        )
     bar_w = (width - gap * (n_series - 1)) / n_series
     group_centers = np.arange(n_groups)
 
-    for i, (series_name, values) in enumerate(data.items()):
+    for i, (series_name, values) in enumerate(normalized_data.items()):
         offsets = group_centers + (i - (n_series - 1) / 2) * (bar_w + gap)
         color = colors[i % len(colors)]
         bars = ax.bar(
@@ -204,6 +218,26 @@ def plot_box(
         ... )
         >>> sp.save(fig, "boxplot")
     """
+    if isinstance(data, (list, tuple)):
+        if not data:
+            raise ValueError("参数 'data' 不能为空列表")
+        for i, values in enumerate(data):
+            values_arr = np.asarray(values, dtype=float).ravel()
+            if values_arr.size == 0:
+                raise ValueError(f"data[{i}] 不能为空")
+            if not np.all(np.isfinite(values_arr)):
+                raise ValueError(f"data[{i}] 不能包含 NaN 或 Inf")
+        if labels is not None and len(labels) != len(data):
+            raise ValueError(
+                f"labels 长度 ({len(labels)}) 与数据组数 ({len(data)}) 不一致"
+            )
+    else:
+        data_arr = np.asarray(data, dtype=float)
+        if data_arr.size == 0:
+            raise ValueError("参数 'data' 不能为空")
+        if not np.all(np.isfinite(data_arr)):
+            raise ValueError("data 不能包含 NaN 或 Inf")
+
     effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     colors = _get_cycle_colors()
@@ -319,10 +353,17 @@ def plot_histogram(
         ...     xlabel="残差", ylabel="概率密度"
         ... )
     """
+    values = np.asarray(data, dtype=float).ravel()
+    finite_values = values[np.isfinite(values)]
+    if finite_values.size == 0:
+        raise ValueError("data 至少需要 1 个有限数值")
+    if not isinstance(bins, int) or bins <= 0:
+        raise ValueError(f"bins 必须为正整数，实际值: {bins!r}")
+
     effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     colors = _get_cycle_colors()
-    ax.hist(data, bins=bins, density=density, alpha=alpha,
+    ax.hist(finite_values, bins=bins, density=density, alpha=alpha,
             color=colors[0], **kwargs)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -348,6 +389,7 @@ def plot_stacked_bar(
     legend_loc: str = "best",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -359,6 +401,7 @@ def plot_stacked_bar(
         width     : 柱宽，默认 0.6
         show_values: 是否在柱上显示数值
         value_fmt : 数值格式，默认 ".1f"
+        lang      : 语言设置
 
     示例:
         >>> data = {
@@ -373,16 +416,35 @@ def plot_stacked_bar(
         ...     show_values=True
         ... )
     """
-    effective_venue = apply_resolved_style(venue, palette)
+    if not categories:
+        raise ValueError("参数 'categories' 不能为空列表")
+    data = validate_dict_not_empty(data, "data")
+    width = validate_positive_number(width, "width", allow_zero=False)
+
+    n_groups = len(categories)
+    normalized_data: Dict[str, np.ndarray] = {}
+    for series_name, values in data.items():
+        series_values = np.asarray(
+            validate_array_like(values, f"data['{series_name}']"),
+            dtype=float,
+        )
+        if len(series_values) != n_groups:
+            raise ValueError(
+                f"数据系列 '{series_name}' 的长度 ({len(series_values)}) "
+                f"与 categories 长度 ({n_groups}) 不一致"
+            )
+        if not np.all(np.isfinite(series_values)):
+            raise ValueError(f"数据系列 '{series_name}' 不能包含 NaN 或 Inf")
+        normalized_data[series_name] = series_values
+
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     colors = _get_cycle_colors()
 
-    n_groups = len(categories)
-    n_series = len(data)
     x = np.arange(n_groups)
 
     bottom = np.zeros(n_groups)
-    for i, (series_name, values) in enumerate(data.items()):
+    for i, (series_name, values) in enumerate(normalized_data.items()):
         color = colors[i % len(colors)]
         bars = ax.bar(
             x, values, width=width,
@@ -399,7 +461,7 @@ def plot_stacked_bar(
                         fontsize=plt.rcParams.get("font.size", 9) - 1,
                         color="white" if _is_dark_color(color) else "black",
                     )
-        bottom += np.array(values)
+        bottom += values
 
     ax.set_xticks(x)
     ax.set_xticklabels(categories)
@@ -448,28 +510,44 @@ def plot_horizontal_bar(
         ...     sort=True
         ... )
     """
+    if not categories:
+        raise ValueError("参数 'categories' 不能为空列表")
+    values_arr = np.asarray(values, dtype=float).ravel()
+    if len(categories) != len(values_arr):
+        raise ValueError(
+            f"categories 长度 ({len(categories)}) 与 values 长度 ({len(values_arr)}) 不一致"
+        )
+    if values_arr.size == 0:
+        raise ValueError("参数 'values' 不能为空")
+    if not np.all(np.isfinite(values_arr)):
+        raise ValueError("values 不能包含 NaN 或 Inf")
+    height = validate_positive_number(height, "height", allow_zero=False)
+
     effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     colors = _get_cycle_colors()
 
     # 排序处理（升序，让最大值在顶部）
     if sort:
-        sorted_indices = np.argsort(values)  # 升序
+        sorted_indices = np.argsort(values_arr)  # 升序
         categories = [categories[i] for i in sorted_indices]
-        values = np.array(values)[sorted_indices]
+        values_arr = values_arr[sorted_indices]
 
     y = np.arange(len(categories))
     bar_colors = [colors[i % len(colors)] for i in range(len(categories))]
 
-    bars = ax.barh(y, values, height=height, color=bar_colors, **kwargs)
+    bars = ax.barh(y, values_arr, height=height, color=bar_colors, **kwargs)
 
     if show_values:
-        for bar, v in zip(bars, values):
+        value_offset = max(float(np.max(np.abs(values_arr))) * 0.01, 1e-9)
+        for bar, v in zip(bars, values_arr):
+            text_x = bar.get_width() + (value_offset if bar.get_width() >= 0 else -value_offset)
+            text_ha = "left" if bar.get_width() >= 0 else "right"
             ax.text(
-                bar.get_width() + 0.01 * max(values),
+                text_x,
                 bar.get_y() + bar.get_height() / 2,
                 f"{v:{value_fmt}}",
-                ha="left", va="center",
+                ha=text_ha, va="center",
                 fontsize=plt.rcParams.get("font.size", 9) - 1,
             )
 
@@ -512,6 +590,8 @@ def plot_lollipop(
         raise ValueError(
             f"categories 长度 ({len(categories)}) 与 values 长度 ({len(values_arr)}) 不一致"
         )
+    if not np.all(np.isfinite(values_arr)):
+        raise ValueError("values 不能包含 NaN 或 Inf")
 
     marker_size = validate_positive_number(marker_size, "marker_size", allow_zero=False)
     stem_width = validate_positive_number(stem_width, "stem_width", allow_zero=False)
@@ -556,6 +636,7 @@ def plot_combo(
     bar_width: float = 0.35,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> ComboPlotResult:
     """
@@ -571,6 +652,7 @@ def plot_combo(
         bar_width   : 柱宽，默认 0.35
         venue       : 期刊样式
         palette     : 配色方案
+        lang        : 语言设置
 
     返回:
         PlotResult: 包含 fig 和 axes 的结果对象
@@ -597,32 +679,48 @@ def plot_combo(
 
     if len(x) == 0:
         raise ValueError("x 不能为空")
+    bar_width = validate_positive_number(bar_width, "bar_width", allow_zero=False)
 
     n_groups = len(x)
+    normalized_bar_data: Dict[str, np.ndarray] = {}
     for name, values in bar_data.items():
-        series_values = validate_array_like(values, f"bar_data['{name}']")
+        series_values = np.asarray(
+            validate_array_like(values, f"bar_data['{name}']"),
+            dtype=float,
+        )
         if len(series_values) != n_groups:
             raise ValueError(
                 f"bar_data['{name}'] 长度 ({len(series_values)}) 与 x 长度 ({n_groups}) 不一致"
             )
+        if not np.all(np.isfinite(series_values)):
+            raise ValueError(f"bar_data['{name}'] 不能包含 NaN 或 Inf")
+        normalized_bar_data[name] = series_values
 
+    normalized_line_data: Optional[Dict[str, np.ndarray]] = None
     if line_data:
+        normalized_line_data = {}
         for name, values in line_data.items():
-            series_values = validate_array_like(values, f"line_data['{name}']")
+            series_values = np.asarray(
+                validate_array_like(values, f"line_data['{name}']"),
+                dtype=float,
+            )
             if len(series_values) != n_groups:
                 raise ValueError(
                     f"line_data['{name}'] 长度 ({len(series_values)}) 与 x 长度 ({n_groups}) 不一致"
                 )
+            if not np.all(np.isfinite(series_values)):
+                raise ValueError(f"line_data['{name}'] 不能包含 NaN 或 Inf")
+            normalized_line_data[name] = series_values
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax_bar = new_figure(effective_venue)
     colors = _get_cycle_colors()
 
-    n_bars = len(bar_data)
+    n_bars = len(normalized_bar_data)
     indices = np.arange(n_groups)
 
     bar_width_eff = bar_width / n_bars
-    for i, (name, values) in enumerate(bar_data.items()):
+    for i, (name, values) in enumerate(normalized_bar_data.items()):
         offset = (i - (n_bars - 1) / 2) * bar_width_eff
         color = colors[i % len(colors)]
         ax_bar.bar(indices + offset, values, bar_width_eff, label=name, color=color, **kwargs)
@@ -633,15 +731,15 @@ def plot_combo(
     ax_bar.set_ylabel(ylabel_left)
 
     ax_line = None
-    if line_data:
+    if normalized_line_data:
         ax_line = ax_bar.twinx()
         ax_line.tick_params(direction="in")
 
         line_colors = colors[n_bars:]
-        if len(line_colors) < len(line_data):
+        if len(line_colors) < len(normalized_line_data):
             line_colors = colors
 
-        for i, (name, values) in enumerate(line_data.items()):
+        for i, (name, values) in enumerate(normalized_line_data.items()):
             color = line_colors[i % len(line_colors)]
             ax_line.plot(indices, values, "o-", color=color, label=name, markersize=5)
 
