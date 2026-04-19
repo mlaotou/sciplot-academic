@@ -214,15 +214,15 @@ class TestLayoutFunctionsReturnTypes:
         assert isinstance(result[0], Figure)
         assert isinstance(result[1], np.ndarray)
         
-    def test_create_gridspec_returns_tuple(self, reset_style, cleanup_figures):
-        """create_gridspec 应该返回 (Figure, GridSpec)"""
+    def test_create_gridspec_returns_gridspec_result(self, reset_style, cleanup_figures):
+        """create_gridspec 应该返回 GridSpecResult"""
         result = sp.create_gridspec(2, 3, venue="nature")
-        assert isinstance(result, tuple)
-        assert len(result) == 2
-        assert isinstance(result[0], Figure)
+        from sciplot._core.result import GridSpecResult
+        assert isinstance(result, GridSpecResult)
+        assert isinstance(result.fig, Figure)
         # GridSpec 类型检查
         from matplotlib.gridspec import GridSpec
-        assert isinstance(result[1], GridSpec)
+        assert isinstance(result.gridspec, GridSpec)
 
 
 class TestUtilityFunctionsReturnTypes:

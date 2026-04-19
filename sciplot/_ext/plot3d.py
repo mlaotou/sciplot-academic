@@ -17,6 +17,7 @@ from matplotlib.figure import Figure
 from sciplot._core.result import PlotResult
 from sciplot._core.utils import apply_resolved_style
 from sciplot._core.layout import new_figure
+from sciplot._core.style import VENUES
 
 
 def _validate_grid_shapes(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -36,6 +37,16 @@ def _validate_grid_shapes(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> Tuple[
     return X_arr, Y_arr, Z_arr
 
 
+def _get_3d_figsize(venue: Optional[str]) -> Tuple[float, float]:
+    """获取3D图形的尺寸，基于venue设置。"""
+    if venue and venue in VENUES:
+        _, (w, h), _ = VENUES[venue]
+        # 3D图通常需要更大的尺寸来展示深度
+        return (w * 1.2, h * 1.2)
+    # 默认尺寸
+    return (8, 6)
+
+
 def plot_surface(
     X: np.ndarray,
     Y: np.ndarray,
@@ -50,6 +61,7 @@ def plot_surface(
     azim: float = -60,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -68,6 +80,7 @@ def plot_surface(
         azim   : 方位角（水平旋转），默认 -60
         venue  : 期刊样式
         palette: 配色方案
+        lang   : 语言设置
 
     返回:
         PlotResult: 包含 fig 和 ax 的绘图结果对象
@@ -85,8 +98,9 @@ def plot_surface(
 
     X, Y, Z = _validate_grid_shapes(X, Y, Z)
 
-    effective_venue = apply_resolved_style(venue, palette)
-    fig = plt.figure(figsize=(8, 6))
+    effective_venue = apply_resolved_style(venue, palette, lang)
+    figsize = _get_3d_figsize(effective_venue)
+    fig = plt.figure(figsize=figsize)
     ax = fig.add_subplot(111, projection="3d")
 
     surf = ax.plot_surface(X, Y, Z, cmap=cmap, alpha=alpha, **kwargs)
@@ -115,6 +129,7 @@ def plot_contour(
     show_labels: bool = True,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -132,6 +147,7 @@ def plot_contour(
         show_labels: 是否显示等高线数值标签
         venue      : 期刊样式
         palette    : 配色方案
+        lang       : 语言设置
 
     返回:
         PlotResult: 包含 fig 和 ax 的绘图结果对象
@@ -145,7 +161,7 @@ def plot_contour(
     """
     X, Y, Z = _validate_grid_shapes(X, Y, Z)
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
     if filled:
@@ -182,6 +198,7 @@ def plot_3d_scatter(
     azim: float = -60,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -201,6 +218,7 @@ def plot_3d_scatter(
         azim   : 方位角
         venue  : 期刊样式
         palette: 配色方案
+        lang   : 语言设置
 
     返回:
         PlotResult: 包含 fig 和 ax 的绘图结果对象
@@ -240,8 +258,9 @@ def plot_3d_scatter(
                 f"点大小数组 s 长度必须为 1 或与数据点数量一致，实际为 {s_arr.size}"
             )
 
-    effective_venue = apply_resolved_style(venue, palette)
-    fig = plt.figure(figsize=(8, 6))
+    effective_venue = apply_resolved_style(venue, palette, lang)
+    figsize = _get_3d_figsize(effective_venue)
+    fig = plt.figure(figsize=figsize)
     ax = fig.add_subplot(111, projection="3d")
 
     scatter = ax.scatter(x_arr, y_arr, z_arr, c=c_arr, s=s_arr, alpha=alpha, cmap=cmap, **kwargs)
@@ -275,6 +294,7 @@ def plot_wireframe(
     azim: float = -60,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -295,6 +315,7 @@ def plot_wireframe(
         azim       : 方位角
         venue      : 期刊样式
         palette    : 配色方案
+        lang       : 语言设置
 
     返回:
         PlotResult: 包含 fig 和 ax 的绘图结果对象
@@ -307,8 +328,9 @@ def plot_wireframe(
 
     X, Y, Z = _validate_grid_shapes(X, Y, Z)
 
-    effective_venue = apply_resolved_style(venue, palette)
-    fig = plt.figure(figsize=(8, 6))
+    effective_venue = apply_resolved_style(venue, palette, lang)
+    figsize = _get_3d_figsize(effective_venue)
+    fig = plt.figure(figsize=figsize)
     ax = fig.add_subplot(111, projection="3d")
 
     ax.plot_wireframe(

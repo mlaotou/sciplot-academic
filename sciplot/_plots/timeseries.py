@@ -52,6 +52,7 @@ def plot_timeseries(
     marker: Optional[str] = None,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -96,7 +97,7 @@ def plot_timeseries(
     if len(t) != len(y):
         raise ValueError(f"t 长度 ({len(t)}) 与 y 长度 ({len(y)}) 不一致")
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
     x_type = _detect_x_type(t)
@@ -133,10 +134,10 @@ def plot_timeseries(
 
             ax.axvline(x=event_time, color=event_color, linestyle="--", alpha=0.7)
 
-            y_pos = ax.get_ylim()[1] * 0.95
             ax.annotate(
                 event_label,
-                xy=(event_time, y_pos),
+                xy=(event_time, 0.95),
+                xycoords=("data", "axes fraction"),
                 xytext=(5, 0),
                 textcoords="offset points",
                 ha="left", va="top",
@@ -170,6 +171,7 @@ def plot_multi_timeseries(
     title: str = "",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -198,7 +200,7 @@ def plot_multi_timeseries(
             f"labels 长度 ({len(labels)}) 与 y_list 长度 ({len(y_list)}) 不一致"
         )
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
     x_type = _detect_x_type(t)
@@ -225,10 +227,10 @@ def plot_multi_timeseries(
             event_label = event.get("label", "")
             event_color = event.get("color", "red")
             ax.axvline(x=event_time, color=event_color, linestyle="--", alpha=0.7)
-            y_pos = ax.get_ylim()[1] * 0.95
             ax.annotate(
                 event_label,
-                xy=(event_time, y_pos),
+                xy=(event_time, 0.95),
+                xycoords=("data", "axes fraction"),
                 xytext=(5, 0),
                 textcoords="offset points",
                 ha="left", va="top",
@@ -250,4 +252,70 @@ def plot_multi_timeseries(
     return PlotResult(fig, ax, metadata={"venue": venue, "palette": palette})
 
 
-__all__ = ["plot_timeseries", "plot_multi_timeseries"]
+def plot_slope(
+    labels: List[str],
+    before: Union[List[float], np.ndarray],
+    after: Union[List[float], np.ndarray],
+    left_label: str = "Before",
+    right_label: str = "After",
+    show_diff: bool = True,
+    show_grid: bool = False,
+    title: str = "",
+    venue: Optional[str] = None,
+    palette: Optional[str] = None,
+    lang: Optional[str] = None,
+    **kwargs: Any,
+) -> PlotResult:
+    """绘制斜率图，展示两时点或两条件变化。"""
+    if not labels:
+        raise ValueError("参数 'labels' 不能为空列表")
+
+    before_arr = np.asarray(before, dtype=float)
+    after_arr = np.asarray(after, dtype=float)
+
+    if before_arr.ndim != 1 or after_arr.ndim != 1:
+        raise ValueError("before 和 after 必须是一维数组")
+    if len(labels) != len(before_arr) or len(labels) != len(after_arr):
+        raise ValueError(
+            "labels、before、after 长度必须一致"
+        )
+
+    effective_venue = apply_resolved_style(venue, palette, lang)
+    fig, ax = new_figure(effective_venue)
+
+    colors = [c["color"] for c in plt.rcParams["axes.prop_cycle"]]
+    if not colors:
+        colors = ["#1f77b4", "#ff7f0e"]
+
+    x_positions = np.array([0.0, 1.0])
+    left_x, right_x = x_positions
+
+    for i, (name, b_val, a_val) in enumerate(zip(labels, before_arr, after_arr)):
+        color = colors[i % len(colors)]
+        ax.plot(x_positions, [b_val, a_val], marker="o", color=color, alpha=0.85, **kwargs)
+
+        ax.text(left_x - 0.03, b_val, f"{name}", ha="right", va="center")
+        if show_diff:
+            diff = a_val - b_val
+            ax.text(right_x + 0.03, a_val, f"{a_val:.2f} ({diff:+.2f})", ha="left", va="center")
+        else:
+            ax.text(right_x + 0.03, a_val, f"{a_val:.2f}", ha="left", va="center")
+
+    y_min = float(np.nanmin(np.concatenate([before_arr, after_arr])))
+    y_max = float(np.nanmax(np.concatenate([before_arr, after_arr])))
+    y_margin = (y_max - y_min) * 0.08 if y_max > y_min else max(abs(y_max) * 0.08, 0.5)
+
+    ax.set_xlim(-0.25, 1.25)
+    ax.set_ylim(y_min - y_margin, y_max + y_margin)
+    ax.set_xticks([left_x, right_x])
+    ax.set_xticklabels([left_label, right_label])
+    if title:
+        ax.set_title(title)
+    if show_grid:
+        ax.grid(axis="y", linestyle="--", alpha=0.4)
+    ax.tick_params(direction="in")
+
+    return PlotResult(fig, ax, metadata={"venue": venue, "palette": palette})
+
+
+__all__ = ["plot_timeseries", "plot_multi_timeseries", "plot_slope"]

@@ -11,7 +11,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from sciplot._core.style import setup_style
-from sciplot._core.palette import DEFAULT_PALETTE
+from sciplot._core.palette import DEFAULT_PALETTE, RESIDENT_PALETTES
 from sciplot._core.layout import new_figure
 from sciplot._core.utils import apply_resolved_style, validate_labels_match_data
 from sciplot._core.result import PlotResult
@@ -19,6 +19,21 @@ from sciplot._core.result import PlotResult
 
 LINE_STYLES: List[str] = ["-", "--", "-.", ":"]
 MARKERS: List[str] = ["o", "s", "^", "D", "v", "<", ">", "p", "*", "h"]
+_AUTO_SUBSET_BASES = {"pastel", "earth", "ocean", "forest", "sunset"}
+
+
+def _resolve_auto_subset_palette(palette: Optional[str], n_series: int) -> str:
+    """根据系列数自动选择内置配色子集。"""
+    effective_palette = palette or DEFAULT_PALETTE
+    if "-" in effective_palette:
+        return effective_palette
+
+    if effective_palette in _AUTO_SUBSET_BASES:
+        candidate = f"{effective_palette}-{n_series}"
+        if candidate in RESIDENT_PALETTES:
+            return candidate
+
+    return effective_palette
 
 
 def _validate_xy_lengths(x: np.ndarray, y: np.ndarray, x_name: str = "x", y_name: str = "y") -> None:
@@ -38,10 +53,14 @@ def plot_line(
     label: str = "",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
     绘制单条折线图
+
+    参数:
+        lang: 语言设置，如 "zh", "en" 等
 
     示例:
         >>> x = np.linspace(0, 10, 200)
@@ -50,7 +69,7 @@ def plot_line(
     """
     _validate_xy_lengths(x, y)
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     ax.plot(x, y, label=label, **kwargs)
     ax.set_xlabel(xlabel)
@@ -76,6 +95,7 @@ def plot_multi(
     title: str = "",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -91,6 +111,7 @@ def plot_multi(
         y_list : Y 轴数据列表 [y1, y2, ...]
         labels : 图例标签列表；为 None 则自动生成 "Series 1, 2, …"
         palette: 默认 pastel；也可用 earth / ocean / 人民币系列
+        lang   : 语言设置
 
     示例:
         >>> # 2 条线 → 自动用 pastel-2
@@ -102,14 +123,12 @@ def plot_multi(
         ...                         labels=["A", "B", "C"])
     """
     n = len(y_list)
-    effective_palette = palette
-    if n <= 4 and palette in ("pastel", "earth", "ocean"):
-        effective_palette = f"{palette}-{n}"
+    effective_palette = _resolve_auto_subset_palette(palette, n)
 
     return plot_multi_line(
         x, y_list,
         labels=labels, xlabel=xlabel, ylabel=ylabel, title=title,
-        venue=venue, palette=effective_palette,
+        venue=venue, palette=effective_palette, lang=lang,
         use_linestyles=False, **kwargs,
     )
 
@@ -123,7 +142,9 @@ def plot_multi_line(
     title: str = "",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     use_linestyles: bool = False,
+    show_legend: bool = True,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -132,6 +153,8 @@ def plot_multi_line(
     参数:
         use_linestyles: True 时在不同颜色外叠加线型循环（- -- -. :），
                         提升黑白打印/色盲可读性
+        show_legend   : 是否显示图例，默认 True；当 labels 为自动生成时可设为 False
+        lang          : 语言设置
 
     示例:
         >>> fig, ax = sp.plot_multi_line(
@@ -140,7 +163,7 @@ def plot_multi_line(
         ...     palette="ocean-3", use_linestyles=True
         ... )
     """
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
     labels = validate_labels_match_data(labels, y_list)
@@ -160,7 +183,8 @@ def plot_multi_line(
     ax.set_ylabel(ylabel)
     if title:
         ax.set_title(title)
-    ax.legend()
+    if show_legend:
+        ax.legend()
     ax.tick_params(direction="in")
     return PlotResult(fig, ax, metadata={"venue": venue, "palette": palette})
 
@@ -176,6 +200,7 @@ def plot_scatter(
     alpha: float = 0.7,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -184,6 +209,7 @@ def plot_scatter(
     参数:
         s    : 点大小，默认 20
         alpha: 透明度，默认 0.7
+        lang : 语言设置
 
     示例:
         >>> fig, ax = sp.plot_scatter(x, y, xlabel="X", ylabel="Y",
@@ -192,7 +218,7 @@ def plot_scatter(
     """
     _validate_xy_lengths(x, y)
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     sc = ax.scatter(x, y, s=s, alpha=alpha, label=label, **kwargs)
     ax.set_xlabel(xlabel)
@@ -215,6 +241,7 @@ def plot_step(
     where: str = "mid",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -225,6 +252,7 @@ def plot_step(
                'mid'  → 台阶在 x 中点（默认，直方图风格）
                'pre'  → 台阶在左端
                'post' → 台阶在右端
+        lang : 语言设置
 
     示例:
         >>> # 绘制 CDF
@@ -236,7 +264,7 @@ def plot_step(
     """
     _validate_xy_lengths(x, y)
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     ax.step(x, y, where=where, label=label, **kwargs)
     ax.set_xlabel(xlabel)
@@ -260,14 +288,16 @@ def plot_area(
     fill: bool = True,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
     绘制面积图（折线下方填充）
 
     参数:
-        alpha: 填充区域透明度，默认 0.3
+        alpha: 填充区域透明度，默认 0.3；fill=False 时应用于线条透明度
         fill : 是否填充面积，默认 True；False 则只画线
+        lang : 语言设置
 
     示例:
         >>> # 简单面积图
@@ -283,10 +313,10 @@ def plot_area(
     """
     _validate_xy_lengths(x, y)
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
-    (line,) = ax.plot(x, y, label=label, **kwargs)
+    (line,) = ax.plot(x, y, label=label, alpha=alpha if not fill else 1.0, **kwargs)
     color = line.get_color()
 
     if fill:
@@ -313,6 +343,7 @@ def plot_multi_area(
     alpha: float = 0.3,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -321,6 +352,7 @@ def plot_multi_area(
     参数:
         stacked: True 则绘制堆叠面积图，False 则各组独立
         alpha  : 填充透明度，默认 0.3
+        lang   : 语言设置
 
     示例:
         >>> # 独立面积图
@@ -335,11 +367,9 @@ def plot_multi_area(
     import matplotlib.pyplot as plt
 
     n = len(y_list)
-    effective_palette = palette
-    if n <= 4 and palette in ("pastel", "earth", "ocean"):
-        effective_palette = f"{palette}-{n}"
+    effective_palette = _resolve_auto_subset_palette(palette, n)
 
-    effective_venue = apply_resolved_style(venue, effective_palette)
+    effective_venue = apply_resolved_style(venue, effective_palette, lang)
     fig, ax = new_figure(effective_venue)
 
     labels = validate_labels_match_data(labels, y_list)
@@ -363,12 +393,10 @@ def plot_multi_area(
                            color=color, label=lbl, **kwargs)
             y_stack = y_stack + y
     else:
-        # 独立面积图
+        # 独立面积图 - 使用 fill_between 的 label 参数
         for i, (y, lbl) in enumerate(zip(y_list, labels)):
             color = colors[i % len(colors)]
-            ax.plot(x, y, color=color, **kwargs)
-            ax.fill_between(x, y, alpha=alpha, color=color)
-            ax.plot([], [], color=color, label=lbl)  # 用于图例
+            ax.fill_between(x, y, alpha=alpha, color=color, label=lbl)
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -376,4 +404,16 @@ def plot_multi_area(
         ax.set_title(title)
     ax.legend()
     ax.tick_params(direction="in")
-    return PlotResult(fig, ax, metadata={"venue": venue, "palette": palette})
+    return PlotResult(fig, ax, metadata={"venue": venue, "palette": effective_palette})
+
+
+__all__ = [
+    "plot_line",
+    "plot",
+    "plot_multi",
+    "plot_multi_line",
+    "plot_scatter",
+    "plot_step",
+    "plot_area",
+    "plot_multi_area",
+]

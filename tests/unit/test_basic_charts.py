@@ -244,9 +244,8 @@ class TestComboChart:
         
         result = sp.plot_combo(x, bar_data, line_data)
         assert isinstance(result, sp.PlotResult)
-        fig, axes = result
+        fig, ax_bar, ax_line = result
         assert isinstance(fig, Figure)
-        ax_bar, ax_line = result.ax_array
         assert ax_line is not None
 
 

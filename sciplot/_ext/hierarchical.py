@@ -15,6 +15,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from sciplot._core.layout import new_figure
+from sciplot._core.style import VENUES
 from sciplot._core.utils import apply_resolved_style
 from sciplot._core.result import PlotResult
 
@@ -172,7 +173,9 @@ def plot_clustermap(
     hierarchy, distance = _check_scipy()
 
     effective_venue = apply_resolved_style(venue, palette)
-    fig = plt.figure(figsize=(10, 10))
+    _, base_figsize, _ = VENUES.get(effective_venue or "nature", VENUES["nature"])
+    heatmap_scale = max(base_figsize)
+    fig = plt.figure(figsize=(heatmap_scale, heatmap_scale))
 
     n_rows, n_cols = data.shape
 

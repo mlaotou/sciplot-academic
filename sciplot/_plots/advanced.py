@@ -31,6 +31,7 @@ def plot_errorbar(
     markersize: float = 5,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -49,7 +50,17 @@ def plot_errorbar(
         ... )
         >>> sp.save(fig, "errorbar")
     """
-    effective_venue = apply_resolved_style(venue, palette)
+    # 输入验证
+    x = np.asarray(x)
+    y = np.asarray(y)
+    if len(x) != len(y):
+        raise ValueError(f"x 长度 ({len(x)}) 与 y 长度 ({len(y)}) 不一致")
+    if hasattr(yerr, '__len__') and not isinstance(yerr, (int, float)):
+        yerr_arr = np.asarray(yerr)
+        if yerr_arr.ndim == 1 and len(yerr_arr) != len(y):
+            raise ValueError(f"yerr 长度 ({len(yerr_arr)}) 与 y 长度 ({len(y)}) 不一致")
+
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     ax.errorbar(
         x, y, yerr=yerr, fmt=fmt,
@@ -74,11 +85,12 @@ def plot_confidence(
     ylabel: str = "",
     title: str = "",
     label_mean: str = "Mean",
-    label_std: str = "±1σ",
+    label_std: Optional[str] = None,
     n_std: float = 1.0,
     alpha: float = 0.25,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -87,9 +99,11 @@ def plot_confidence(
     参数:
         y_mean : 均值曲线
         y_std  : 标准差
+        label_std: 阴影带标签，None 时根据 n_std 自动推断
         n_std  : 阴影带宽度（以标准差为单位），默认 1.0（±1σ）
                  设为 1.96 可画出 95% 置信区间
         alpha  : 阴影透明度，默认 0.25
+        **kwargs: 传递给 ax.plot() 的额外参数（只影响线条，不影响填充）
 
     示例:
         >>> fig, ax = sp.plot_confidence(
@@ -102,7 +116,18 @@ def plot_confidence(
         >>> fig, ax = sp.plot_confidence(x, mean, se, n_std=1.96,
         ...     label_std="95% CI")
     """
-    effective_venue = apply_resolved_style(venue, palette)
+    # 自动推断 label_std
+    if label_std is None:
+        if abs(n_std - 1.96) < 0.01:
+            label_std = "95% CI"
+        elif abs(n_std - 2.576) < 0.01:
+            label_std = "99% CI"
+        elif abs(n_std - 1.0) < 0.01:
+            label_std = "±1σ"
+        else:
+            label_std = f"±{n_std:.2g}σ"
+
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     (line,) = ax.plot(x, y_mean, label=label_mean, **kwargs)
     color = line.get_color()
@@ -132,8 +157,12 @@ def plot_heatmap(
     show_values: bool = False,
     fmt: str = ".2f",
     colorbar_label: str = "",
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+    aspect: str = "auto",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -147,6 +176,9 @@ def plot_heatmap(
         show_values  : 是否在格子内显示数值
         fmt          : 数值格式，如 ".2f" / ".0f" / "d"
         colorbar_label: 颜色条标签
+        vmin         : 颜色映射最小值
+        vmax         : 颜色映射最大值
+        aspect       : 纵横比（"auto" | "equal"）
 
     示例:
         >>> corr = np.corrcoef(data.T)
@@ -170,10 +202,10 @@ def plot_heatmap(
             f"col_labels 长度 ({len(col_labels)}) 与列数 ({data.shape[1]}) 不一致"
         )
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
-    im = ax.imshow(data, cmap=cmap, aspect="auto", vmin=None, vmax=None, **kwargs)
+    im = ax.imshow(data, cmap=cmap, aspect=aspect, vmin=vmin, vmax=vmax, **kwargs)
     cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     if colorbar_label:
         cbar.set_label(colorbar_label)

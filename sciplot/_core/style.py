@@ -4,9 +4,31 @@
 
 from __future__ import annotations
 
+import contextvars
+import shutil
 from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
+
+
+# ============================================================================
+# 上下文变量 — 线程安全的语言设置
+# ============================================================================
+
+# 使用 contextvars 实现线程/协程安全的全局状态
+_current_lang: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    '_current_lang', default=None
+)
+
+
+def get_current_lang() -> Optional[str]:
+    """获取当前设置的语言代码（线程安全）"""
+    return _current_lang.get()
+
+
+def set_current_lang(lang: Optional[str]) -> None:
+    """设置当前语言代码（线程安全）"""
+    _current_lang.set(lang)
 
 
 # ============================================================================
@@ -21,7 +43,6 @@ VENUES: Dict[str, tuple] = {
     "springer":     (["science",             "no-latex"], (6.0, 4.5),  8),  # 10→8
     "thesis":       (["science",             "no-latex"], (6.1, 4.3),  8),  # 10→8 (Word论文)
     "presentation": (["science", "notebook", "no-latex"], (8.0, 5.5), 12),  # 14→12
-    "default":      (["science", "nature",   "no-latex"], (7.0, 5.0),  8),  # 10→8
 }
 
 # ============================================================================
@@ -34,6 +55,9 @@ LANGUAGES: Dict[str, Tuple[Optional[str], str]] = {
     "zh-cn": ("cjk-sc-font", "SimSun"),       # 简体中文（别名）
     "en":    (None,           "Times New Roman"),  # 纯英文
 }
+
+# 有效的语言代码列表
+VALID_LANGS = set(LANGUAGES.keys())
 
 
 def setup_style(
@@ -63,6 +87,9 @@ def setup_style(
         >>> sp.setup_style("thesis", "100yuan")       # 学位论文 + 人民币红
         >>> sp.setup_style(lang="en")                 # 英文模式
     """
+    # 使用线程安全的上下文变量设置语言
+    set_current_lang(lang)
+
     if venue not in VENUES:
         raise ValueError(
             f"未知 venue '{venue}'，可用选项: {list(VENUES.keys())}"
@@ -110,8 +137,11 @@ def setup_style(
     # 中文模式下禁用 LaTeX（LaTeX 不支持中文）
     # 英文模式下可启用 LaTeX 以获得更好的数学公式渲染
     if lang == "en":
-        # 英文模式：启用 LaTeX（如果系统已安装）
-        plt.rcParams["text.usetex"] = True
+        # 英文模式：检测系统是否安装 LaTeX，有则启用，无则静默降级
+        if shutil.which("latex") or shutil.which("xelatex") or shutil.which("pdflatex"):
+            plt.rcParams["text.usetex"] = True
+        else:
+            plt.rcParams["text.usetex"] = False
     else:
         # 中文模式：禁用 LaTeX，确保中文正常渲染
         plt.rcParams["text.usetex"] = False

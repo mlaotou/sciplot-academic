@@ -104,10 +104,12 @@ class StyleContext:
                 if self.venue is None and self.lang is None and self.palette is not None:
                     apply_palette(self.palette)
                 else:
+                    from sciplot._core.style import get_current_lang
+                    effective_lang = self.lang or get_current_lang() or "zh"
                     setup_style(
                         venue=self.venue or "nature",
                         palette=self.palette or "pastel",
-                        lang=self.lang if self.lang is not None else "zh",
+                        lang=effective_lang,
                     )
 
             # 应用额外的 rcParams

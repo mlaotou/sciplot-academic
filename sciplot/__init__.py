@@ -24,7 +24,7 @@ SciPlot Academic — 期刊级科研绘图库
     >>> fig, ax = sp.scatter(x, y)   # 同 plot_scatter
     >>> fig, ax = sp.bar(x, y)       # 同 plot_bar
 
-配色体系（四大内置配色系）:
+配色体系（内置配色）:
     pastel / pastel-1~6  — 柔和粉彩（默认）
     ocean  / ocean-1~6   — 海洋蓝绿
     forest / forest-1~6  — 森林渐变
@@ -34,7 +34,40 @@ SciPlot Academic — 期刊级科研绘图库
     nature（默认）| ieee | aps | springer | thesis | presentation
 """
 
-__version__ = "1.7.4"
+from pathlib import Path as _Path
+
+
+def _read_local_version() -> str:
+    """优先读取源码仓库 pyproject.toml 中的版本。"""
+    pyproject_path = _Path(__file__).resolve().parent.parent / "pyproject.toml"
+    if not pyproject_path.exists():
+        return ""
+
+    try:
+        import tomllib as _toml
+    except ImportError:
+        try:
+            import tomli as _toml
+        except ImportError:
+            return ""
+
+    try:
+        with pyproject_path.open("rb") as f:
+            data = _toml.load(f)
+        return str(data.get("project", {}).get("version", ""))
+    except Exception:
+        return ""
+
+
+_LOCAL_VERSION = _read_local_version()
+if _LOCAL_VERSION:
+    __version__ = _LOCAL_VERSION
+else:
+    try:
+        from importlib.metadata import version as _get_version
+        __version__ = _get_version("sciplot-academic")
+    except Exception:
+        __version__ = "1.8.0"
 __author__ = "SciPlot Team"
 
 import warnings as _warnings
@@ -74,6 +107,8 @@ from sciplot._core.palette import (
     list_ocean_subsets,
     list_forest_subsets,
     list_sunset_subsets,
+    list_rmb_palettes,
+    list_diverging_palettes,
     list_color_schemes,
     auto_select_palette,
     DEFAULT_PALETTE,
@@ -83,6 +118,8 @@ from sciplot._core.palette import (
     OCEAN_PALETTE,
     FOREST_PALETTE,
     SUNSET_PALETTE,
+    RMB_PALETTES,
+    DIVERGING_PALETTES,
     ALL_PALETTES,
 )
 from sciplot._core.layout import (
@@ -119,11 +156,13 @@ from sciplot._core.context import (
 # ── 返回类型 (Result Types) ────────────────────────────────────
 from sciplot._core.result import (
     PlotResult,
+    ComboPlotResult,
     GridSpecResult,
 )
 
 # ── 公共工具函数 (Utilities) ───────────────────────────────────
 from sciplot._core.utils import (
+    validate_params,
     validate_array_like,
     validate_labels_match_data,
     validate_positive_number,
@@ -138,6 +177,38 @@ from sciplot._core.config import (
     get_config,
     load_config,
     reset_config,
+)
+
+# ── 类型定义 (Type Definitions) ─────────────────────────────────
+from sciplot._core.types import (
+    # 基础类型
+    Array,
+    NumericArray,
+    IntArray,
+    BoolArray,
+    OptionalArray,
+    # 图表类型
+    VenueType,
+    LangType,
+    PaletteType,
+    CmapType,
+    LineStyleType,
+    MarkerType,
+    LegendLocType,
+    AlignType,
+    VaAlignType,
+    # 参数类型
+    PlotKwargs,
+    LabelsType,
+    TitleType,
+    XLabelType,
+    YLabelType,
+    ZLabelType,
+    # 返回值类型
+    ColorRGB,
+    ColorRGBA,
+    FigSize,
+    ConfigDict,
 )
 
 # ── 图表 ──────────────────────────────────────────────────────
@@ -158,6 +229,7 @@ from sciplot._plots.distribution import (
     plot_grouped_bar,
     plot_stacked_bar,
     plot_horizontal_bar,
+    plot_lollipop,
     plot_box,
     plot_violin,
     plot_histogram,
@@ -175,14 +247,18 @@ from sciplot._plots.polar import (
 from sciplot._plots.timeseries import (
     plot_timeseries,
     plot_multi_timeseries,
+    plot_slope,
 )
 from sciplot._plots.multivariate import (
     plot_parallel,
+    plot_scatter_matrix,
 )
 from sciplot._plots.statistical import (
     plot_residuals,
     plot_qq,
     plot_bland_altman,
+    plot_density,
+    plot_multi_density,
 )
 
 # ── 扩展模块 (Extensions) ──────────────────────────────────────
@@ -197,19 +273,6 @@ from sciplot._ext.plot3d import (
     plot_contour,
     plot_3d_scatter,
     plot_wireframe,
-)
-from sciplot._ext.network import (
-    plot_network,
-    plot_network_from_matrix,
-    plot_network_communities,
-)
-from sciplot._ext.hierarchical import (
-    plot_dendrogram,
-    plot_clustermap,
-)
-from sciplot._ext.venn import (
-    plot_venn2,
-    plot_venn3,
 )
 
 # ── 简洁别名 (Aliases) ────────────────────────────────────────
@@ -293,6 +356,81 @@ def palette(palette_name: str) -> PlotChain:
     return _palette_chain(palette_name)
 
 
+_LAZY_EXT = {
+    "plot_network": ("sciplot._ext.network", "networkx"),
+    "plot_network_from_matrix": ("sciplot._ext.network", "networkx"),
+    "plot_network_communities": ("sciplot._ext.network", "networkx"),
+    "plot_dendrogram": ("sciplot._ext.hierarchical", "scipy"),
+    "plot_clustermap": ("sciplot._ext.hierarchical", "scipy"),
+    "plot_venn2": ("sciplot._ext.venn", "matplotlib-venn"),
+    "plot_venn3": ("sciplot._ext.venn", "matplotlib-venn"),
+}
+
+
+def __getattr__(name: str):
+    if name in _LAZY_EXT:
+        import importlib
+
+        module_path, dep_name = _LAZY_EXT[name]
+        try:
+            mod = importlib.import_module(module_path)
+            attr = getattr(mod, name)
+        except ImportError:
+            raise ImportError(
+                f"sp.{name}() 需要安装 {dep_name}。\n"
+                f"请运行: pip install {dep_name}"
+            ) from None
+
+        globals()[name] = attr
+        return attr
+
+    raise AttributeError(f"module 'sciplot' has no attribute {name!r}")
+
+
+def inspect() -> None:
+    """输出 SciPlot 运行环境诊断信息。"""
+    import importlib
+    import importlib.util
+
+    print(f"SciPlot Academic v{__version__} 环境诊断")
+    print("=" * 38)
+
+    def _check_pkg(import_name: str, display_name: str) -> None:
+        spec = importlib.util.find_spec(import_name)
+        if spec is None:
+            print(f"[MISS] {display_name:<16} 未安装")
+            return
+        try:
+            mod = importlib.import_module(import_name)
+            ver = getattr(mod, "__version__", "unknown")
+        except Exception:
+            ver = "unknown"
+        print(f"[OK]   {display_name:<16} {ver}")
+
+    _check_pkg("matplotlib", "matplotlib")
+    _check_pkg("numpy", "numpy")
+    _check_pkg("scienceplots", "scienceplots")
+    _check_pkg("scipy", "scipy")
+    _check_pkg("networkx", "networkx")
+    _check_pkg("matplotlib_venn", "matplotlib-venn")
+    _check_pkg("sklearn", "scikit-learn")
+
+    try:
+        from matplotlib import font_manager
+
+        font_names = {f.name for f in font_manager.fontManager.ttflist}
+        print("\n字体检查:")
+        print("[OK]   SimSun" if "SimSun" in font_names else "[MISS] SimSun")
+        print("[OK]   Times New Roman" if "Times New Roman" in font_names else "[MISS] Times New Roman")
+    except Exception:
+        print("\n字体检查: 无法读取字体列表")
+
+    print("\n配色信息:")
+    preview = ", ".join(list_palettes()[:12])
+    print(f"已注册配色(前12个): {preview}")
+    print(f"当前默认: venue={get_config('venue')}, palette={get_config('palette')}, lang={get_config('lang')}")
+
+
 __all__ = [
     "__version__",
 
@@ -305,7 +443,8 @@ __all__ = [
     "get_palette", "get_color_scheme",
     "list_palettes", "list_all_palettes", "list_resident_palettes",
     "list_pastel_subsets", "list_earth_subsets", "list_ocean_subsets",
-    "list_forest_subsets", "list_sunset_subsets", "list_color_schemes",
+    "list_forest_subsets", "list_sunset_subsets", "list_rmb_palettes",
+    "list_diverging_palettes", "list_color_schemes",
     "auto_select_palette",
 
     # ── 布局 ──
@@ -314,7 +453,7 @@ __all__ = [
     "add_panel_labels", "list_paper_layouts",
 
     # ── 链式调用 ──
-    "style", "palette", "chain",
+    "style", "palette", "chain", "inspect",
     "PlotChain", "FigureWrapper",
 
     # ── 上下文管理器 ──
@@ -323,7 +462,7 @@ __all__ = [
     "StyleContext",
 
     # ── 返回类型 ──
-    "PlotResult", "GridSpecResult",
+    "PlotResult", "ComboPlotResult", "GridSpecResult",
 
     # ── 验证工具 ──
     "validate_array_like", "validate_labels_match_data",
@@ -342,7 +481,7 @@ __all__ = [
     "multi", "multi_line", "multi_area",
 
     # ── 分布 / 统计（完整名称）──
-    "plot_bar", "plot_grouped_bar", "plot_stacked_bar", "plot_horizontal_bar",
+    "plot_bar", "plot_grouped_bar", "plot_stacked_bar", "plot_horizontal_bar", "plot_lollipop",
     "plot_box", "plot_violin", "plot_histogram",
     "plot_combo", "annotate_significance",
 
@@ -361,13 +500,13 @@ __all__ = [
     "plot_radar",
 
     # ── 时序图表 ──
-    "plot_timeseries", "plot_multi_timeseries",
+    "plot_timeseries", "plot_multi_timeseries", "plot_slope",
 
     # ── 多维图表 ──
-    "plot_parallel",
+    "plot_parallel", "plot_scatter_matrix",
 
     # ── 统计图表 ──
-    "plot_residuals", "plot_qq", "plot_bland_altman",
+    "plot_residuals", "plot_qq", "plot_bland_altman", "plot_density", "plot_multi_density",
 
     # ── 机器学习扩展 ──
     "plot_pca", "plot_confusion_matrix",
@@ -398,7 +537,7 @@ __all__ = [
     "VENUES", "PAPER_LAYOUTS", "LANGUAGES",
     "RESIDENT_PALETTES",
     "PASTEL_PALETTE", "EARTH_PALETTE", "OCEAN_PALETTE",
-    "FOREST_PALETTE", "SUNSET_PALETTE",
+    "FOREST_PALETTE", "SUNSET_PALETTE", "RMB_PALETTES", "DIVERGING_PALETTES",
     "LINE_STYLES", "MARKERS", "DEFAULT_PALETTE", "ALL_PALETTES",
 
     # ── 状态 ──

@@ -120,6 +120,8 @@ def create_subplots(
     venue: str = "nature",
     sharex: bool = False,
     sharey: bool = False,
+    palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> Tuple[Figure, Union[Axes, np.ndarray]]:
     """
@@ -132,13 +134,15 @@ def create_subplots(
         nrows, ncols: 行列数
         venue       : 期刊预设（影响字号和比例）
         sharex/sharey: 是否共享坐标轴
+        palette     : 配色方案
+        lang        : 语言设置
 
     示例:
         >>> fig, axes = sp.create_subplots(2, 2, venue="ieee", sharex=True)
         >>> axes[0, 0].plot(x, y)
     """
     from sciplot._core.style import setup_style
-    setup_style(venue)
+    setup_style(venue, palette or "pastel", lang or "zh")
 
     _, base_figsize, _ = VENUES[venue]
     figsize = (base_figsize[0] * ncols * 0.85, base_figsize[1] * nrows * 0.85)
@@ -154,8 +158,10 @@ def create_subplots(
 def paper_subplots(
     nrows: int = 1,
     ncols: int = 1,
-    venue: str = "thesis",
+    venue: str = "nature",
     figsize: Optional[Tuple[float, float]] = None,
+    palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> Tuple[Figure, Union[Axes, np.ndarray]]:
     """
@@ -168,6 +174,8 @@ def paper_subplots(
         nrows, ncols: 行列数
         venue       : 论文类型（'thesis' | 'ieee' | 'nature' | 'aps' | 'springer'）
         figsize     : 覆盖预设尺寸（可选）
+        palette     : 配色方案
+        lang        : 语言设置
 
     示例:
         >>> # Word 论文 1×2 子图，精确匹配 A4 版心
@@ -180,7 +188,7 @@ def paper_subplots(
         >>> fig, axes = sp.paper_subplots(2, 2, venue="ieee")
     """
     from sciplot._core.style import setup_style
-    setup_style(venue)
+    setup_style(venue, palette or "pastel", lang or "zh")
 
     if figsize is not None:
         final_figsize = figsize
@@ -202,10 +210,18 @@ def create_gridspec(
     nrows: int = 1,
     ncols: int = 1,
     venue: str = "nature",
+    palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
-) -> Tuple[Figure, GridSpec]:
+) -> "GridSpecResult":
     """
     创建 GridSpec 不规则子图布局
+
+    参数:
+        nrows, ncols: 行列数
+        venue       : 期刊预设
+        palette     : 配色方案
+        lang        : 语言设置
 
     示例:
         >>> fig, gs = sp.create_gridspec(2, 3, venue="nature")
@@ -217,11 +233,12 @@ def create_gridspec(
         >>> sp.save(fig, "gridspec")
     """
     from sciplot._core.style import setup_style
-    setup_style(venue)
+    from sciplot._core.result import GridSpecResult
+    setup_style(venue, palette or "pastel", lang or "zh")
     _, figsize, _ = VENUES[venue]
     fig = plt.figure(figsize=figsize)
     gs = GridSpec(nrows, ncols, figure=fig, **kwargs)
-    return fig, gs
+    return GridSpecResult(fig, gs)
 
 
 def create_twinx(ax: Axes) -> Axes:
@@ -229,8 +246,8 @@ def create_twinx(ax: Axes) -> Axes:
     创建共享 X 轴的副 Y 轴（双 Y 轴）
 
     示例:
-        >>> fig, ax1 = sp.new_figure("ieee")
         >>> sp.setup_style("ieee", "pastel-2")
+        >>> fig, ax1 = sp.new_figure("ieee")
         >>> ax1.plot(x, temp, color="#cdb4db", label="温度")
         >>> ax1.set_ylabel("温度 (K)", color="#cdb4db")
         >>> ax2 = sp.create_twinx(ax1)
@@ -342,11 +359,13 @@ def add_panel_labels(
             )
 
     for ax, lbl in zip(ax_list, final_labels):
+        # 根据 x 坐标自动推断对齐方式
+        ha = "right" if x <= 0 else "left"
         kw: Dict[str, Any] = dict(
             transform=ax.transAxes,
             fontweight=fontweight,
             va="top",
-            ha="right",
+            ha=ha,
         )
         if fontsize is not None:
             kw["fontsize"] = fontsize

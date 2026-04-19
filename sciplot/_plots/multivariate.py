@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 
 from sciplot._core.layout import new_figure
 from sciplot._core.utils import apply_resolved_style
@@ -42,11 +43,13 @@ def plot_parallel(
     labels: Optional[List[str]] = None,
     color_by: Optional[Union[int, str]] = None,
     normalize: str = "minmax",
+    show_colorbar: bool = True,
     alpha: float = 0.5,
     linewidth: float = 1.0,
     title: str = "",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -64,6 +67,7 @@ def plot_parallel(
                    - "minmax": Min-Max 归一化到 [0, 1]（默认）
                    - "zscore": Z-Score 标准化
                    - "none": 不归一化
+        show_colorbar: 连续着色时是否显示 colorbar，默认 True
         alpha    : 线条透明度，默认 0.5
         linewidth: 线条宽度，默认 1.0
 
@@ -120,7 +124,7 @@ def plot_parallel(
     else:
         raise ValueError(f"未知的归一化方式: {normalize}。可选: 'minmax', 'zscore', 'none'")
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
     x = np.arange(n_features)
@@ -156,7 +160,6 @@ def plot_parallel(
 
             legend_handles = []
             for v in unique_values:
-                from matplotlib.lines import Line2D
                 legend_handles.append(
                     Line2D([0], [0], color=color_map[v], linewidth=linewidth, label=str(v))
                 )
@@ -177,10 +180,11 @@ def plot_parallel(
                 color = cmap(norm(val)) if np.isfinite(val) else colors[0]
                 ax.plot(x, data_norm[i, :], alpha=alpha, color=color, linewidth=linewidth, **kwargs)
 
-            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-            sm.set_array([])
-            cbar = fig.colorbar(sm, ax=ax, fraction=0.046, pad=0.04)
-            cbar.set_label(columns[color_idx])
+            if show_colorbar:
+                sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+                sm.set_array([])
+                cbar = fig.colorbar(sm, ax=ax, fraction=0.046, pad=0.04)
+                cbar.set_label(columns[color_idx])
     else:
         for i in range(n_samples):
             ax.plot(x, data_norm[i, :], alpha=alpha, linewidth=linewidth, **kwargs)
@@ -204,4 +208,121 @@ def plot_parallel(
     return PlotResult(fig, ax, metadata={"venue": venue, "palette": palette})
 
 
-__all__ = ["plot_parallel"]
+def plot_scatter_matrix(
+    data: np.ndarray,
+    columns: Optional[List[str]] = None,
+    color_by: Optional[np.ndarray] = None,
+    diag: str = "hist",
+    alpha: float = 0.5,
+    s: float = 10,
+    venue: Optional[str] = None,
+    palette: Optional[str] = None,
+    lang: Optional[str] = None,
+) -> PlotResult:
+    """绘制散点矩阵，展示多特征两两关系。"""
+    values = np.asarray(data, dtype=float)
+    if values.ndim != 2:
+        raise ValueError(f"data 必须是二维数组，当前维度: {values.ndim}")
+
+    n_samples, n_features = values.shape
+    if n_features < 2:
+        raise ValueError(f"至少需要 2 个特征，当前: {n_features}")
+
+    if columns is None:
+        columns = [f"特征 {i + 1}" for i in range(n_features)]
+    elif len(columns) != n_features:
+        raise ValueError(
+            f"columns 长度 ({len(columns)}) 与特征数 ({n_features}) 不一致"
+        )
+
+    if color_by is not None:
+        color_values = np.asarray(color_by)
+        if color_values.ndim != 1 or len(color_values) != n_samples:
+            raise ValueError("color_by 必须是一维且长度与样本数一致")
+    else:
+        color_values = None
+
+    diag = diag.lower()
+    if diag not in {"hist", "kde", "none"}:
+        raise ValueError("diag 仅支持 'hist'、'kde'、'none'")
+
+    if diag == "kde":
+        try:
+            from scipy import stats as scipy_stats
+        except ImportError as e:
+            raise ImportError(
+                "diag='kde' 需要安装 scipy。请运行: pip install scipy"
+            ) from e
+    else:
+        scipy_stats = None
+
+    effective_venue = apply_resolved_style(venue, palette, lang)
+    matrix_size = max(4.0, min(14.0, n_features * 2.2))
+    fig, axes = plt.subplots(
+        n_features,
+        n_features,
+        squeeze=False,
+        figsize=(matrix_size, matrix_size),
+    )
+
+    if color_values is not None:
+        is_numeric = np.issubdtype(color_values.dtype, np.number)
+        unique_vals = np.unique(color_values)
+        if (not is_numeric) or len(unique_vals) <= 10:
+            colors = [c["color"] for c in plt.rcParams["axes.prop_cycle"]]
+            color_map = {v: colors[i % len(colors)] for i, v in enumerate(unique_vals)}
+            scatter_colors = [color_map[v] for v in color_values]
+            cmap = None
+        else:
+            cmap = "viridis"
+            scatter_colors = color_values.astype(float)
+    else:
+        scatter_colors = None
+        cmap = None
+
+    for row in range(n_features):
+        for col in range(n_features):
+            ax = axes[row, col]
+            x_col = values[:, col]
+            y_col = values[:, row]
+
+            if row == col:
+                if diag == "hist":
+                    ax.hist(x_col, bins=20, alpha=0.75)
+                elif diag == "kde":
+                    finite = x_col[np.isfinite(x_col)]
+                    if finite.size >= 2 and scipy_stats is not None:
+                        kde = scipy_stats.gaussian_kde(finite)
+                        x_eval = np.linspace(finite.min(), finite.max(), 200)
+                        y_eval = kde(x_eval)
+                        ax.plot(x_eval, y_eval)
+                        ax.fill_between(x_eval, y_eval, alpha=0.2)
+                # diag == "none" 时保持空白
+            else:
+                ax.scatter(
+                    x_col,
+                    y_col,
+                    c=scatter_colors,
+                    cmap=cmap,
+                    s=s,
+                    alpha=alpha,
+                    edgecolors="none",
+                )
+
+            if row == n_features - 1:
+                ax.set_xlabel(columns[col])
+            else:
+                ax.set_xticklabels([])
+
+            if col == 0:
+                ax.set_ylabel(columns[row])
+            else:
+                ax.set_yticklabels([])
+
+            ax.tick_params(direction="in")
+
+    fig.tight_layout()
+    return PlotResult(fig, axes, metadata={"venue": effective_venue, "palette": palette})
+
+
+__all__ = ["plot_parallel", "plot_scatter_matrix"]

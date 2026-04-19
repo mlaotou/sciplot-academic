@@ -46,6 +46,7 @@ def plot_pca(
     n_components: int = 2,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -57,6 +58,7 @@ def plot_pca(
         n_components: 降维维度，目前仅支持 2
         venue       : 期刊样式，如 "nature", "ieee"
         palette     : 配色方案，如 "pastel", "earth"
+        lang        : 语言设置
 
     返回:
         PlotResult: 包含 fig 和 ax 的绘图结果对象
@@ -94,7 +96,7 @@ def plot_pca(
 
     PCA, _ = _check_sklearn()
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
     pca = PCA(n_components=n_components)
@@ -124,6 +126,7 @@ def plot_confusion_matrix(
     cmap: str = "Blues",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -137,6 +140,7 @@ def plot_confusion_matrix(
         cmap     : 颜色映射
         venue    : 期刊样式
         palette  : 配色方案
+        lang     : 语言设置
 
     返回:
         PlotResult: 包含 fig 和 ax 的绘图结果对象
@@ -165,7 +169,7 @@ def plot_confusion_matrix(
     import itertools
     _, confusion_matrix = _check_sklearn()
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
     cm = confusion_matrix(y_true, y_pred)
@@ -204,6 +208,7 @@ def plot_feature_importance(
     top_n: Optional[int] = None,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -216,6 +221,7 @@ def plot_feature_importance(
         top_n     : 只显示前 N 个最重要特征；None 则显示全部
         venue     : 期刊样式
         palette   : 配色方案
+        lang      : 语言设置
 
     返回:
         PlotResult: 包含 fig 和 ax 的绘图结果对象
@@ -238,13 +244,16 @@ def plot_feature_importance(
     if top_n is not None and top_n <= 0:
         raise ValueError(f"top_n 必须为正整数，实际值: {top_n}")
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
-    indices = np.argsort(importance)[::-1]
-    if top_n is not None:
-        indices = indices[:top_n]
-    indices = indices[::-1]
+    # 优化排序逻辑：直接取最大的 top_n 个，然后升序排列（水平条形图从下到上）
+    if top_n is not None and top_n < len(features):
+        # 取重要性最高的 top_n 个索引
+        indices = np.argsort(importance)[-top_n:]
+    else:
+        # 全部数据，按重要性排序
+        indices = np.argsort(importance)
 
     sorted_features = [features[i] for i in indices]
     sorted_importance = importance[indices]
@@ -269,6 +278,7 @@ def plot_learning_curve(
     label_val: str = "Validation",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -284,6 +294,7 @@ def plot_learning_curve(
         label_val   : 验证集图例标签
         venue       : 期刊样式
         palette     : 配色方案
+        lang        : 语言设置
 
     返回:
         PlotResult: 包含 fig 和 ax 的绘图结果对象
@@ -306,7 +317,7 @@ def plot_learning_curve(
     if len(train_scores) == 0:
         raise ValueError("train_scores 和 val_scores 不能为空")
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
     if train_sizes is None:

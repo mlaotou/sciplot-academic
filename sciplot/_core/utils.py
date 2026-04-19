@@ -6,31 +6,124 @@
 
 from __future__ import annotations
 
+import functools
 from collections.abc import Sequence
-from typing import Optional, Tuple, Union, List, Any, overload, TypeVar, Dict
+from typing import Optional, Tuple, Union, List, Any, overload, TypeVar, Dict, Callable
 
 import numpy as np
 from numpy.typing import ArrayLike
 
 K = TypeVar("K")
 V = TypeVar("V")
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+# ═══════════════════════════════════════════════════════════════
+# 参数验证装饰器
+# ═══════════════════════════════════════════════════════════════
+
+def validate_params(
+    *,
+    arrays: Optional[List[str]] = None,
+    positive: Optional[List[str]] = None,
+    non_empty: Optional[List[str]] = None,
+    choices: Optional[Dict[str, List[str]]] = None,
+    equal_length: Optional[List[Tuple[str, str]]] = None,
+) -> Callable[[F], F]:
+    """
+    统一的参数验证装饰器。
+
+    参数:
+        arrays: 需要验证为类数组的参数名列表
+        positive: 需要验证为正数的参数名列表
+        non_empty: 需要验证为非空的参数名列表
+        choices: 需要验证在选项中的参数，格式为 {参数名: [选项列表]}
+        equal_length: 需要验证等长的参数对，格式为 [(参数1, 参数2), ...]
+
+    示例:
+        >>> @validate_params(
+        ...     arrays=["x", "y"],
+        ...     positive=["alpha"],
+        ...     equal_length=[("x", "y")],
+        ... )
+        ... def plot_line(x, y, alpha=1.0, **kwargs):
+        ...     ...
+    """
+    def decorator(func: F) -> F:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # 获取函数签名和参数绑定
+            import inspect
+            sig = inspect.signature(func)
+            bound = sig.bind(*args, **kwargs)
+            bound.apply_defaults()
+            
+            # 验证类数组参数
+            if arrays:
+                for name in arrays:
+                    value = bound.arguments.get(name)
+                    if value is not None:
+                        validate_array_like(value, name)
+            
+            # 验证正数参数
+            if positive:
+                for name in positive:
+                    value = bound.arguments.get(name)
+                    if value is not None:
+                        validate_positive_number(value, name, allow_zero=True)
+            
+            # 验证非空参数
+            if non_empty:
+                for name in non_empty:
+                    value = bound.arguments.get(name)
+                    if value is not None:
+                        if isinstance(value, (list, tuple)) and len(value) == 0:
+                            raise ValueError(f"参数 '{name}' 不能为空")
+                        if isinstance(value, dict) and len(value) == 0:
+                            raise ValueError(f"参数 '{name}' 不能为空字典")
+            
+            # 验证选项参数
+            if choices:
+                for name, options in choices.items():
+                    value = bound.arguments.get(name)
+                    if value is not None:
+                        validate_choice(value, options, name)
+            
+            # 验证等长参数
+            if equal_length:
+                for name1, name2 in equal_length:
+                    value1 = bound.arguments.get(name1)
+                    value2 = bound.arguments.get(name2)
+                    if value1 is not None and value2 is not None:
+                        len1 = len(value1) if hasattr(value1, '__len__') else 0
+                        len2 = len(value2) if hasattr(value2, '__len__') else 0
+                        if len1 != len2:
+                            raise ValueError(
+                                f"参数 '{name1}' 长度 ({len1}) 与 '{name2}' 长度 ({len2}) 不一致"
+                            )
+            
+            return func(*args, **kwargs)
+        return wrapper  # type: ignore
+    return decorator
 
 
 def resolve_style_venue(
     venue: Optional[str],
     palette: Optional[str],
+    lang: Optional[str] = None,
     default_venue: str = "nature",
     default_palette: str = "pastel",
 ) -> Tuple[Optional[str], bool]:
     """
     解析并应用样式参数。
 
-    此函数用于统一处理各绘图函数的 venue/palette 参数，
+    此函数用于统一处理各绘图函数的 venue/palette/lang 参数，
     决定是否需要应用新样式或复用当前 rcParams。
 
     参数:
         venue: 期刊样式，如 "nature", "ieee", "thesis" 等
         palette: 配色方案，如 "pastel", "earth", "100yuan" 等
+        lang: 语言设置，如 "zh", "en" 等
         default_venue: 默认期刊样式
         default_palette: 默认配色方案
 
@@ -40,24 +133,24 @@ def resolve_style_venue(
             - 第二个元素：是否需要应用样式
 
     使用示例:
-        >>> effective_venue, should_apply = resolve_style_venue(venue, palette)
+        >>> effective_venue, should_apply = resolve_style_venue(venue, palette, lang)
         >>> if should_apply:
-        ...     setup_style(effective_venue, effective_palette)
+        ...     setup_style(effective_venue, effective_palette, effective_lang)
         >>> fig, ax = new_figure(effective_venue)
     """
-    if venue is None and palette is None:
+    if venue is None and palette is None and lang is None:
         from sciplot._core.context import StyleContext
         if StyleContext.is_in_context():
             return None, False
 
     effective_venue = venue or default_venue
-    effective_palette = palette or default_palette
     return effective_venue, True
 
 
 def apply_resolved_style(
     venue: Optional[str],
     palette: Optional[str],
+    lang: Optional[str] = None,
 ) -> Optional[str]:
     """
     解析并应用样式（便捷函数）。
@@ -67,16 +160,29 @@ def apply_resolved_style(
     参数:
         venue: 期刊样式
         palette: 配色方案
+        lang: 语言设置，如 "zh", "en" 等
 
     返回:
         应使用的 venue（None 表示复用当前样式）
     """
-    effective_venue, should_apply = resolve_style_venue(venue, palette)
+    effective_venue, should_apply = resolve_style_venue(venue, palette, lang)
     if should_apply:
-        from sciplot._core.style import setup_style
+        from sciplot._core.style import setup_style, get_current_lang, VALID_LANGS
         from sciplot._core.palette import DEFAULT_PALETTE
         effective_palette = palette or DEFAULT_PALETTE
-        setup_style(effective_venue, effective_palette)
+        
+        # 确定有效语言：优先使用传入的lang，否则使用全局状态（如果有效），否则使用默认值
+        if lang is not None:
+            effective_lang = lang
+        else:
+            current_lang = get_current_lang()
+            # 验证全局语言状态是否有效
+            if current_lang is not None and current_lang in VALID_LANGS:
+                effective_lang = current_lang
+            else:
+                effective_lang = "zh"
+        
+        setup_style(effective_venue, effective_palette, lang=effective_lang)
     return effective_venue
 
 
@@ -283,6 +389,7 @@ def validate_dict_not_empty(
 __all__ = [
     "resolve_style_venue",
     "apply_resolved_style",
+    "validate_params",
     "validate_array_like",
     "validate_labels_match_data",
     "validate_positive_number",

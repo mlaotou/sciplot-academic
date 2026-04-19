@@ -27,6 +27,7 @@ class TestPaletteBasics:
         """测试列出内置色系"""
         residents = sp.list_resident_palettes()
         assert "pastel" in residents
+        assert "earth" in residents
         assert "ocean" in residents
         assert "forest" in residents
         assert "sunset" in residents
@@ -121,18 +122,36 @@ class TestAutoPaletteSelection:
         
         # 2 条线应该使用 -2
         fig, ax = sp.plot_multi(x, [test_data["y"], test_data["y2"]])
+        colors = [line.get_color() for line in ax.lines]
+        assert colors[:2] == sp.get_palette("pastel-2")
         assert fig is not None
         plt.close(fig)
         
         # 3 条线应该使用 -3
         fig, ax = sp.plot_multi(x, [test_data["y"], test_data["y2"], test_data["y3"]])
+        colors = [line.get_color() for line in ax.lines]
+        assert colors[:3] == sp.get_palette("pastel-3")
         assert fig is not None
         plt.close(fig)
         
         # 4 条线应该使用 -4
         y4 = np.sin(x) * 0.5
         fig, ax = sp.plot_multi(x, [test_data["y"], test_data["y2"], test_data["y3"], y4])
+        colors = [line.get_color() for line in ax.lines]
+        assert colors[:4] == sp.get_palette("pastel-4")
         assert fig is not None
+        plt.close(fig)
+
+    def test_plot_multi_auto_select_earth(self, reset_style, test_data):
+        """测试指定 earth 时自动选择 earth-N 子集"""
+        x = test_data["x"]
+        fig, ax = sp.plot_multi(
+            x,
+            [test_data["y"], test_data["y2"], test_data["y3"]],
+            palette="earth",
+        )
+        colors = [line.get_color() for line in ax.lines]
+        assert colors[:3] == sp.get_palette("earth-3")
         plt.close(fig)
 
 
@@ -263,17 +282,35 @@ class TestPaletteConstants:
         assert sp.DEFAULT_PALETTE == "pastel"
 
 
-class TestRemovedPalettes:
-    """测试已移除的配色"""
-    
-    def test_rmb_palettes_removed(self):
-        """测试人民币配色已移除"""
-        with pytest.raises((KeyError, ValueError, AttributeError)):
-            sp.get_palette("100yuan")
-            
-    def test_rmb_list_function_removed(self):
-        """测试 list_rmb_palettes 函数已移除"""
-        assert not hasattr(sp, "list_rmb_palettes")
+class TestRMBPalettes:
+    """测试人民币配色恢复"""
+
+    def test_rmb_palettes_available(self):
+        """人民币配色应可直接获取"""
+        palette = sp.get_palette("100yuan")
+        assert isinstance(palette, list)
+        assert len(palette) == 5
+
+    def test_list_rmb_palettes(self):
+        """应提供 list_rmb_palettes 入口"""
+        names = sp.list_rmb_palettes()
+        assert "100yuan" in names
+        assert "1yuan" in names
+
+
+class TestDivergingPalettes:
+    """测试发散配色及 cmap 注册"""
+
+    def test_diverging_palette_available(self):
+        palette = sp.get_palette("rdbu")
+        assert isinstance(palette, list)
+        assert len(palette) == 7
+
+    def test_rdbu_heatmap_cmap_registered(self, reset_style):
+        data = np.random.randn(5, 5)
+        fig, ax = sp.plot_heatmap(data, cmap="rdbu")
+        assert fig is not None
+        plt.close(fig)
 
 
 class TestColorBlindFriendly:

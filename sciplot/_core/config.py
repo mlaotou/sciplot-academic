@@ -22,15 +22,36 @@
 from __future__ import annotations
 
 import threading
+import warnings
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
 
-try:
-    import tomllib
-except ImportError:
-    import tomli as tomllib
-
 _CONFIG_LOCK = threading.Lock()
+_TOML_IMPORT_WARNED = False
+
+
+def _load_toml_module():
+    """按优先级加载 TOML 解析器（tomllib -> tomli）。"""
+    global _TOML_IMPORT_WARNED
+
+    try:
+        import tomllib as _toml_module
+        return _toml_module
+    except ImportError:
+        pass
+
+    try:
+        import tomli as _toml_module
+        return _toml_module
+    except ImportError:
+        if not _TOML_IMPORT_WARNED:
+            warnings.warn(
+                "配置文件功能需要 Python 3.11+ 或安装 tomli: pip install tomli",
+                UserWarning,
+                stacklevel=3,
+            )
+            _TOML_IMPORT_WARNED = True
+        return None
 
 _CONFIG_TYPES: Dict[str, Tuple[type, ...]] = {
     "venue": (str,),
@@ -140,32 +161,37 @@ class SciPlotConfig:
                 cls._user_settings[key] = _normalize_config_value(key, value)
 
     @classmethod
-    def get(cls, key: str) -> Any:
+    def get(cls, key: str, default: Any = None) -> Any:
         """
         获取配置值（按优先级）
 
         优先级：代码设置 > 配置文件 > 内置默认
 
         参数:
-            key: 配置项名称
+            key: 配置项名称，支持嵌套键（如 'style.venue'）
+            default: 默认值，当配置项不存在时返回
 
         返回:
             配置值
-
-        抛出:
-            KeyError: 配置项名称无效
 
         示例:
             >>> sp.get_config("venue")  # "nature"
         """
         with _CONFIG_LOCK:
+            if "." in key:
+                section, sub_key = key.split(".", 1)
+                for settings in [cls._user_settings, cls._file_settings, cls._defaults]:
+                    section_data = settings.get(section)
+                    if isinstance(section_data, dict) and sub_key in section_data:
+                        return section_data[sub_key]
+                return default
             if key in cls._user_settings:
                 return cls._user_settings[key]
             if key in cls._file_settings:
                 return cls._file_settings[key]
             if key in cls._defaults:
                 return cls._defaults[key]
-        raise KeyError(f"未知配置项: '{key}'")
+        return default
 
     @classmethod
     def get_all(cls) -> Dict[str, Any]:
@@ -300,10 +326,14 @@ class SciPlotConfig:
         返回:
             解析后的字典，失败返回 None
         """
+        toml_module = _load_toml_module()
+        if toml_module is None:
+            return None
+
         try:
             with open(path, "rb") as f:
-                return tomllib.load(f)
-        except (OSError, tomllib.TOMLDecodeError):
+                return toml_module.load(f)
+        except (OSError, toml_module.TOMLDecodeError):
             return None
 
     @classmethod

@@ -13,9 +13,9 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from sciplot._core.style import setup_style, reset_style
-from sciplot._core.palette import apply_palette
-from sciplot._core.layout import new_figure, save as _save
+from sciplot._core.style import setup_style
+from sciplot._core.layout import new_figure
+from sciplot._core.result import PlotResult
 
 
 class PlotChain:
@@ -129,6 +129,11 @@ class PlotChain:
         示例:
             >>> sp.figsize(10, 6).plot(x, y)
         """
+        if self._fig is not None:
+            raise RuntimeError(
+                "figsize() 必须在调用任何绘图方法之前设置。"
+                "当前图形已创建，无法修改尺寸。"
+            )
         self._figsize = (width, height)
         return self
 
@@ -183,157 +188,31 @@ class PlotChain:
     def area(self, x, y, **kwargs) -> FigureWrapper:
         """绘制面积图"""
         self._ensure_figure()
+        alpha = kwargs.pop('alpha', 0.3)
         (line,) = self._ax.plot(x, y, **kwargs)
         color = line.get_color()
-        alpha = kwargs.get('alpha', 0.3)
         self._ax.fill_between(x, y, alpha=alpha, color=color)
         return FigureWrapper(self._fig, self._ax, self)
 
 
-class FigureWrapper:
-    """
-    图形包装器 - 支持继续添加图层和最终操作
-
-    由 PlotChain 的绘图方法返回，支持：
-    - 继续添加图层（plot, scatter 等）
-    - 设置标签、标题、图例
-    - 保存图形
-    """
+class FigureWrapper(PlotResult):
+    """Fluent API 返回类型，基于 PlotResult 扩展。"""
 
     def __init__(self, fig: Figure, ax: Axes, chain: PlotChain):
-        self._fig = fig
-        self._ax = ax
+        super().__init__(fig, ax, metadata={"venue": chain._venue, "palette": chain._palette})
         self._chain = chain
-
-    # ═══════════════════════════════════════════════════════════════
-    # 继续添加图层（返回 self 支持链式调用）
-    # ═══════════════════════════════════════════════════════════════
-
-    def plot(self, x, y, **kwargs) -> FigureWrapper:
-        """添加折线"""
-        self._ax.plot(x, y, **kwargs)
-        return self
-
-    def scatter(self, x, y, **kwargs) -> FigureWrapper:
-        """添加散点"""
-        self._ax.scatter(x, y, **kwargs)
-        return self
-
-    def bar(self, x, height, **kwargs) -> FigureWrapper:
-        """添加柱状图"""
-        self._ax.bar(x, height, **kwargs)
-        return self
-
-    def fill_between(self, x, y1, y2=None, **kwargs) -> FigureWrapper:
-        """填充区域"""
-        if y2 is None:
-            y2 = 0
-        self._ax.fill_between(x, y1, y2, **kwargs)
-        return self
-
-    def errorbar(self, x, y, yerr=None, xerr=None, **kwargs) -> FigureWrapper:
-        """添加误差线"""
-        self._ax.errorbar(x, y, yerr=yerr, xerr=xerr, **kwargs)
-        return self
-
-    def axhline(self, y, **kwargs) -> FigureWrapper:
-        """添加水平线"""
-        self._ax.axhline(y, **kwargs)
-        return self
-
-    def axvline(self, x, **kwargs) -> FigureWrapper:
-        """添加垂直线"""
-        self._ax.axvline(x, **kwargs)
-        return self
-
-    def annotate(self, text, xy, **kwargs) -> FigureWrapper:
-        """添加标注"""
-        self._ax.annotate(text, xy, **kwargs)
-        return self
-
-    # ═══════════════════════════════════════════════════════════════
-    # 设置方法（返回 self 支持链式调用）
-    # ═══════════════════════════════════════════════════════════════
-
-    def xlabel(self, label: str, **kwargs) -> FigureWrapper:
-        """设置 X 轴标签"""
-        self._ax.set_xlabel(label, **kwargs)
-        return self
-
-    def ylabel(self, label: str, **kwargs) -> FigureWrapper:
-        """设置 Y 轴标签"""
-        self._ax.set_ylabel(label, **kwargs)
-        return self
-
-    def title(self, title: str, **kwargs) -> FigureWrapper:
-        """设置标题"""
-        self._ax.set_title(title, **kwargs)
-        return self
-
-    def xlim(self, left: Optional[float] = None, right: Optional[float] = None) -> FigureWrapper:
-        """设置 X 轴范围"""
-        self._ax.set_xlim(left, right)
-        return self
-
-    def ylim(self, bottom: Optional[float] = None, top: Optional[float] = None) -> FigureWrapper:
-        """设置 Y 轴范围"""
-        self._ax.set_ylim(bottom, top)
-        return self
-
-    def legend(self, **kwargs) -> FigureWrapper:
-        """添加图例"""
-        self._ax.legend(**kwargs)
-        return self
-
-    def grid(self, visible: bool = True, **kwargs) -> FigureWrapper:
-        """设置网格"""
-        self._ax.grid(visible, **kwargs)
-        return self
-
-    def tight_layout(self) -> FigureWrapper:
-        """自动调整布局"""
-        self._fig.tight_layout()
-        return self
-
-    # ═══════════════════════════════════════════════════════════════
-    # 最终操作（返回结果，结束链式调用）
-    # ═══════════════════════════════════════════════════════════════
-
-    def save(self, name: str, *, dpi: int = 1200, **kwargs):
-        """
-        保存图形
-
-        参数:
-            name: 文件名（不含扩展名）
-            dpi: 分辨率，默认 1200（印刷级）
-            **kwargs: 传递给 savefig 的其他参数
-
-        返回:
-            保存的文件路径列表
-
-        示例:
-            >>> sp.plot(x, y).save("figure", dpi=600)
-        """
-        self._fig.tight_layout()
-        paths = _save(self._fig, name, dpi=dpi, **kwargs)
-        return paths
-
-    def show(self) -> None:
-        """显示图形"""
-        self._fig.tight_layout()
-        plt.show()
 
     def get_figure(self) -> Figure:
         """获取 Figure 对象（用于进一步自定义）"""
-        return self._fig
+        return self.fig
 
     def get_axes(self) -> Axes:
         """获取 Axes 对象（用于进一步自定义）"""
-        return self._ax
+        return self.ax
 
     def unwrap(self) -> Tuple[Figure, Axes]:
         """解包为 (fig, ax) 元组"""
-        return self._fig, self._ax
+        return self.fig, self.ax
 
 
 # ═══════════════════════════════════════════════════════════════

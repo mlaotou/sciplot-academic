@@ -21,7 +21,7 @@ from sciplot._core.utils import (
     validate_array_like,
     validate_positive_number,
 )
-from sciplot._core.result import PlotResult
+from sciplot._core.result import PlotResult, ComboPlotResult
 
 
 # ============================================================================
@@ -37,10 +37,14 @@ def plot_bar(
     width: float = 0.6,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
     绘制单组柱状图（每个柱子自动赋不同颜色）
+
+    参数:
+        lang: 语言设置
 
     示例:
         >>> fig, ax = sp.plot_bar(
@@ -61,7 +65,7 @@ def plot_bar(
         )
     width = validate_positive_number(width, "width", allow_zero=False)
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     colors = _get_cycle_colors()
     bar_colors = [colors[i % len(colors)] for i in range(len(categories))]
@@ -181,6 +185,7 @@ def plot_box(
     showfliers: bool = True,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -189,6 +194,7 @@ def plot_box(
     参数:
         data      : 单个数组或数组列表，每个数组代表一组数据
         showfliers: 是否显示离群点，默认 True
+        lang      : 语言设置
 
     示例:
         >>> fig, ax = sp.plot_box(
@@ -198,7 +204,7 @@ def plot_box(
         ... )
         >>> sp.save(fig, "boxplot")
     """
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     colors = _get_cycle_colors()
 
@@ -232,6 +238,7 @@ def plot_violin(
     showmedians: bool = True,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -240,6 +247,7 @@ def plot_violin(
     参数:
         showmeans  : 是否显示均值线，默认 False
         showmedians: 是否显示中位数线，默认 True
+        lang       : 语言设置
 
     示例:
         >>> fig, ax = sp.plot_violin(
@@ -257,7 +265,7 @@ def plot_violin(
     elif np.asarray(data).size == 0:
         raise ValueError("参数 'data' 不能为空")
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     colors = _get_cycle_colors()
 
@@ -294,6 +302,7 @@ def plot_histogram(
     alpha: float = 0.75,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -302,6 +311,7 @@ def plot_histogram(
     参数:
         bins   : 柱数，默认 30
         density: True 则归一化为概率密度
+        lang   : 语言设置
 
     示例:
         >>> fig, ax = sp.plot_histogram(
@@ -309,7 +319,7 @@ def plot_histogram(
         ...     xlabel="残差", ylabel="概率密度"
         ... )
     """
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     colors = _get_cycle_colors()
     ax.hist(data, bins=bins, density=density, alpha=alpha,
@@ -418,6 +428,7 @@ def plot_horizontal_bar(
     sort: bool = False,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -426,7 +437,7 @@ def plot_horizontal_bar(
     参数:
         height     : 柱高，默认 0.6
         show_values: 是否在柱尾显示数值
-        sort       : 是否按数值降序排序，默认 False
+        sort       : 是否按数值升序排序（最大值在顶部），默认 False
 
     示例:
         >>> fig, ax = sp.plot_horizontal_bar(
@@ -437,13 +448,13 @@ def plot_horizontal_bar(
         ...     sort=True
         ... )
     """
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     colors = _get_cycle_colors()
 
-    # 排序处理
+    # 排序处理（升序，让最大值在顶部）
     if sort:
-        sorted_indices = np.argsort(values)[::-1]
+        sorted_indices = np.argsort(values)  # 升序
         categories = [categories[i] for i in sorted_indices]
         values = np.array(values)[sorted_indices]
 
@@ -473,6 +484,64 @@ def plot_horizontal_bar(
 
 
 # ============================================================================
+# 棒棒糖图
+# ============================================================================
+
+def plot_lollipop(
+    categories: List[str],
+    values: np.ndarray,
+    xlabel: str = "",
+    ylabel: str = "",
+    title: str = "",
+    sort: bool = True,
+    marker_size: float = 8,
+    stem_width: float = 2.0,
+    baseline: float = 0.0,
+    venue: Optional[str] = None,
+    palette: Optional[str] = None,
+    **kwargs: Any,
+) -> PlotResult:
+    """绘制棒棒糖图，用于类别排名与重要性展示。"""
+    if not categories:
+        raise ValueError("参数 'categories' 不能为空列表")
+
+    values_arr = np.asarray(values, dtype=float)
+    if values_arr.ndim != 1:
+        raise ValueError("values 必须是一维数组")
+    if len(categories) != len(values_arr):
+        raise ValueError(
+            f"categories 长度 ({len(categories)}) 与 values 长度 ({len(values_arr)}) 不一致"
+        )
+
+    marker_size = validate_positive_number(marker_size, "marker_size", allow_zero=False)
+    stem_width = validate_positive_number(stem_width, "stem_width", allow_zero=False)
+
+    if sort:
+        order = np.argsort(values_arr)
+        categories = [categories[i] for i in order]
+        values_arr = values_arr[order]
+
+    effective_venue = apply_resolved_style(venue, palette)
+    fig, ax = new_figure(effective_venue)
+    colors = _get_cycle_colors()
+    main_color = colors[0]
+
+    x = np.arange(len(categories))
+    ax.hlines(y=baseline, xmin=-0.5, xmax=len(categories) - 0.5, color="#BFBFBF", linewidth=1)
+    ax.vlines(x, baseline, values_arr, color=main_color, linewidth=stem_width, alpha=0.9)
+    ax.scatter(x, values_arr, s=marker_size**2, color=main_color, zorder=3, **kwargs)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(categories, rotation=45, ha="right")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title(title)
+    ax.tick_params(direction="in")
+    return PlotResult(fig, ax, metadata={"venue": venue, "palette": palette})
+
+
+# ============================================================================
 # 组合图（折线 + 柱状）
 # ============================================================================
 
@@ -488,7 +557,7 @@ def plot_combo(
     venue: Optional[str] = None,
     palette: Optional[str] = None,
     **kwargs: Any,
-) -> PlotResult:
+) -> ComboPlotResult:
     """
     绘制组合图（柱状图 + 折线图，常用于双 Y 轴场景）
 
@@ -588,9 +657,12 @@ def plot_combo(
         ax_bar.set_title(title)
     ax_bar.tick_params(direction="in")
 
-    axes_array = np.array([ax_bar, ax_line]) if ax_line is not None else ax_bar
-
-    return PlotResult(fig, axes_array, metadata={"venue": venue, "palette": palette})
+    return ComboPlotResult(
+        fig,
+        ax_bar=ax_bar,
+        ax_line=ax_line,
+        metadata={"venue": venue, "palette": palette},
+    )
 
 
 # ============================================================================
@@ -621,7 +693,9 @@ def annotate_significance(
     参数:
         ax     : 目标坐标轴
         x1, x2 : 比较的两组在 x 轴上的坐标（通常是 1, 2, 3...）
-        y      : 括号的 Y 坐标（通常设为两组中最高值 + 一点余量）
+        y      : 括号的 Y 坐标（数据坐标，与 y 轴数据单位相同）
+                 默认 0.02，适合 y 轴范围为 [0, 1] 的场景
+                 y 轴范围较大时（如 [0, 100]），建议设为 y_range * 0.03 左右
         p_value: p 值
         h      : 括号高度（axes 单位），默认 0.02
         tip_len: 括号端竖线长度（axes 单位），默认 0.01
@@ -678,12 +752,14 @@ def _get_cycle_colors() -> List[str]:
     return colors
 
 
-def _is_dark_color(hex_color: str) -> bool:
+def _is_dark_color(color: str) -> bool:
     """判断颜色是否为深色（用于决定文字用白色还是黑色）"""
-    h = hex_color.lstrip("#")
-    if len(h) == 3:
-        h = "".join(c * 2 for c in h)
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    # 计算亮度（YIQ 公式）
-    brightness = (r * 299 + g * 587 + b * 114) / 1000
-    return brightness < 128
+    try:
+        import matplotlib.colors as mcolors
+        rgb = mcolors.to_rgb(color)
+        r, g, b = rgb
+        # 计算亮度（YIQ 公式）
+        brightness = (r * 299 + g * 587 + b * 114) / 1000
+        return brightness < 0.502  # 归一化后的阈值
+    except (ValueError, AttributeError):
+        return False

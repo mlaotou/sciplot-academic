@@ -36,9 +36,8 @@ from sciplot._plots.advanced import (
 )
 
 if TYPE_CHECKING:
-    from matplotlib.figure import Figure
-    from matplotlib.axes import Axes
-    from typing import Dict, List, Optional, Sequence, Tuple
+    from sciplot._core.result import PlotResult, ComboPlotResult
+    from typing import Dict, List, Optional, Sequence
     import numpy as np
 
 
@@ -51,8 +50,9 @@ def line(
     label: str = "",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制折线图（plot_line 的别名）"""
     return plot_line(
         x,
@@ -63,6 +63,7 @@ def line(
         label=label,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -78,8 +79,9 @@ def scatter(
     alpha: float = 0.7,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制散点图（plot_scatter 的别名）"""
     return plot_scatter(
         x,
@@ -92,6 +94,7 @@ def scatter(
         alpha=alpha,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -106,8 +109,9 @@ def step(
     where: str = "mid",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制阶梯图（plot_step 的别名）"""
     return plot_step(
         x,
@@ -119,6 +123,7 @@ def step(
         where=where,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -134,8 +139,9 @@ def area(
     fill: bool = True,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制面积图（plot_area 的别名）"""
     return plot_area(
         x,
@@ -148,6 +154,7 @@ def area(
         fill=fill,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -161,8 +168,9 @@ def multi(
     labels: Optional[Sequence[str]] = None,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制多线折线图（plot_multi 的别名）"""
     return plot_multi(
         x,
@@ -173,6 +181,7 @@ def multi(
         title=title,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -186,8 +195,9 @@ def multi_line(
     labels: Optional[Sequence[str]] = None,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制多线折线图（plot_multi_line 的别名）"""
     return plot_multi_line(
         x,
@@ -198,6 +208,7 @@ def multi_line(
         title=title,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -213,8 +224,9 @@ def multi_area(
     stacked: bool = False,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制多系列面积图（plot_multi_area 的别名）"""
     return plot_multi_area(
         x,
@@ -227,6 +239,7 @@ def multi_area(
         alpha=alpha,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -240,8 +253,9 @@ def bar(
     width: float = 0.6,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制柱状图（plot_bar 的别名）"""
     return plot_bar(
         categories,
@@ -252,6 +266,7 @@ def bar(
         width=width,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -269,8 +284,9 @@ def grouped_bar(
     legend_loc: str = "best",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制分组柱状图（plot_grouped_bar 的别名）"""
     return plot_grouped_bar(
         groups,
@@ -285,6 +301,7 @@ def grouped_bar(
         legend_loc=legend_loc,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -301,8 +318,9 @@ def stacked_bar(
     legend_loc: str = "best",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制堆叠柱状图（plot_stacked_bar 的别名）"""
     return plot_stacked_bar(
         categories,
@@ -316,6 +334,7 @@ def stacked_bar(
         legend_loc=legend_loc,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -332,8 +351,9 @@ def hbar(
     sort: bool = False,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制水平柱状图（plot_horizontal_bar 的别名）"""
     return plot_horizontal_bar(
         categories,
@@ -347,6 +367,7 @@ def hbar(
         sort=sort,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -355,14 +376,15 @@ def hist(
     x,
     bins: int = 30,
     xlabel: str = "",
-    ylabel: str = "频率",
+    ylabel: str = "Frequency",
     title: str = "",
     density: bool = False,
     alpha: float = 0.75,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制直方图（plot_histogram 的别名）"""
     return plot_histogram(
         x,
@@ -374,6 +396,7 @@ def hist(
         alpha=alpha,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -387,8 +410,9 @@ def box(
     showfliers: bool = True,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制箱线图（plot_box 的别名）"""
     return plot_box(
         data,
@@ -399,6 +423,7 @@ def box(
         showfliers=showfliers,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -413,8 +438,9 @@ def violin(
     showmedians: bool = True,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制小提琴图（plot_violin 的别名）"""
     return plot_violin(
         data,
@@ -426,6 +452,7 @@ def violin(
         showmedians=showmedians,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -443,8 +470,9 @@ def errorbar(
     markersize: float = 5,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制误差线图（plot_errorbar 的别名）"""
     return plot_errorbar(
         x,
@@ -459,6 +487,7 @@ def errorbar(
         markersize=markersize,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -471,13 +500,14 @@ def confidence(
     ylabel: str = "",
     title: str = "",
     label_mean: str = "Mean",
-    label_std: str = "±1σ",
+    label_std: Optional[str] = None,
     n_std: float = 1.0,
     alpha: float = 0.25,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制置信区间图（plot_confidence 的别名）"""
     return plot_confidence(
         x,
@@ -492,6 +522,7 @@ def confidence(
         alpha=alpha,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -507,10 +538,14 @@ def heatmap(
     show_values: bool = False,
     fmt: str = ".2f",
     colorbar_label: str = "",
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+    aspect: str = "auto",
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes]:
+) -> PlotResult:
     """绘制热力图（plot_heatmap 的别名）"""
     return plot_heatmap(
         data,
@@ -523,8 +558,12 @@ def heatmap(
         show_values=show_values,
         fmt=fmt,
         colorbar_label=colorbar_label,
+        vmin=vmin,
+        vmax=vmax,
+        aspect=aspect,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 
@@ -540,8 +579,9 @@ def combo(
     bar_width: float = 0.35,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs,
-) -> Tuple[Figure, Axes, Any]:
+) -> ComboPlotResult:
     """绘制组合图（plot_combo 的别名）"""
     return plot_combo(
         x,
@@ -554,6 +594,7 @@ def combo(
         bar_width=bar_width,
         venue=venue,
         palette=palette,
+        lang=lang,
         **kwargs,
     )
 

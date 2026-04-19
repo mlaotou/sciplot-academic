@@ -125,7 +125,10 @@ def plot_network(
                 node_colors = [color_map.get(color_values.get(n, 0), colors[0]) for n in G.nodes()]
             else:
                 norm = plt.Normalize(min(color_values.values()), max(color_values.values()))
-                cmap = plt.cm.get_cmap("viridis")
+                try:
+                    cmap = plt.colormaps["viridis"]
+                except Exception:
+                    cmap = plt.cm.get_cmap("viridis")
                 node_colors = [cmap(norm(color_values.get(n, 0))) for n in G.nodes()]
         else:
             node_colors = colors[0]

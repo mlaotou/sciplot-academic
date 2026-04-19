@@ -56,11 +56,13 @@ class PlotResult:
         fig: Figure,
         ax: Union[Axes, np.ndarray],
         metadata: Optional[Dict[str, Any]] = None,
+        auto_close: bool = False,
     ):
         self._fig = fig
         self._ax = ax
         self._metadata = metadata or {}
         self._is_array = isinstance(ax, np.ndarray)
+        self._auto_close = auto_close
 
     # ═══════════════════════════════════════════════════════════════
     # 属性访问
@@ -258,6 +260,7 @@ class PlotResult:
         formats: Tuple[str, ...] = ("pdf", "png"),
         bbox_inches: str = "tight",
         dir: Optional[str] = None,
+        tight: bool = True,
         **kwargs: Any,
     ) -> List[Path]:
         """
@@ -269,11 +272,13 @@ class PlotResult:
             formats: 输出格式，默认 ("pdf", "png")
             bbox_inches: 边界处理，默认 "tight"
             dir: 保存目录
+            tight: 是否自动调整布局，默认 True
 
         返回:
             保存的文件路径列表
         """
-        self._fig.tight_layout()
+        if tight:
+            self._fig.tight_layout()
         return _save(self._fig, name, dpi=dpi, formats=formats,
                      bbox_inches=bbox_inches, dir=dir, **kwargs)
 
@@ -344,9 +349,60 @@ class PlotResult:
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> Literal[False]:
-        """退出上下文时自动关闭图形"""
-        self.close()
+        """退出上下文时根据 auto_close 设置决定是否关闭图形"""
+        if self._auto_close:
+            self.close()
         return False
+
+
+class ComboPlotResult(PlotResult):
+    """组合图结果，兼容 PlotResult 与三元组解包。"""
+
+    def __init__(
+        self,
+        fig: Figure,
+        ax_bar: Axes,
+        ax_line: Optional[Axes] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ):
+        super().__init__(fig, ax_bar, metadata=metadata)
+        self.ax_bar = ax_bar
+        self.ax_line = ax_line
+
+    @property
+    def axes(self) -> Union[Axes, np.ndarray]:
+        if self.ax_line is None:
+            return self.ax_bar
+        return np.array([self.ax_bar, self.ax_line], dtype=object)
+
+    @property
+    def ax_array(self) -> np.ndarray:
+        if self.ax_line is None:
+            raise AttributeError("单 Y 轴组合图没有 ax_array，请使用 result.ax 或 result.ax_bar")
+        return np.array([self.ax_bar, self.ax_line], dtype=object)
+
+    def __iter__(self) -> Iterator[Union[Figure, Optional[Axes]]]:
+        """支持三元解包: fig, ax_bar, ax_line = result"""
+        yield self._fig
+        yield self.ax_bar
+        yield self.ax_line
+
+    def __len__(self) -> int:
+        return 3
+
+    @overload
+    def __getitem__(self, index: int) -> Union[Figure, Optional[Axes]]: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Tuple: ...
+
+    def __getitem__(self, index: Union[int, slice]) -> Union[Figure, Optional[Axes], Tuple]:
+        values: Tuple[Figure, Axes, Optional[Axes]] = (self._fig, self.ax_bar, self.ax_line)
+        if isinstance(index, slice):
+            return values[index]
+        if index in (0, 1, 2):
+            return values[index]
+        raise IndexError("ComboPlotResult 只支持索引 0 (fig)、1 (ax_bar)、2 (ax_line)")
 
 
 class GridSpecResult:
@@ -432,5 +488,6 @@ class GridSpecResult:
 
 __all__ = [
     "PlotResult",
+    "ComboPlotResult",
     "GridSpecResult",
 ]

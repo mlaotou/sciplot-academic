@@ -32,6 +32,12 @@ def auto_rotate_labels(
         >>> fig, ax = sp.plot_bar(categories, values)
         >>> sp.auto_rotate_labels(ax)  # 自动检测并旋转 X 轴标签
     """
+    try:
+        ax.figure.canvas.draw()
+    except Exception:
+        # 无显示后端或特殊环境下 draw 可能失败，降级为直接读取。
+        pass
+
     if axis == "x":
         labels = ax.get_xticklabels()
         tick_labels = [t.get_text() for t in labels]
@@ -84,7 +90,7 @@ def smart_legend(
 
     # 自动计算列数
     if ncols is None:
-        ncols = max(1, len(handles) // 4)
+        ncols = max(1, len(handles) // 4) if len(handles) > 4 else 1
 
     if outside:
         ax.legend(

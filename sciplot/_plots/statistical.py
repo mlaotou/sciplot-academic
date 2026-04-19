@@ -6,7 +6,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+import warnings
+from typing import Any, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +17,18 @@ from matplotlib.figure import Figure
 from sciplot._core.layout import new_figure
 from sciplot._core.utils import apply_resolved_style
 from sciplot._core.result import PlotResult
+
+
+def _check_scipy_stats():
+    """检查 scipy.stats 可用性并返回模块对象。"""
+    try:
+        from scipy import stats
+        return stats
+    except ImportError as e:
+        raise ImportError(
+            "统计图表功能需要安装 scipy。\n"
+            "请运行: pip install scipy 或 pip install sciplot-academic[statistical]"
+        ) from e
 
 
 def plot_residuals(
@@ -28,6 +41,7 @@ def plot_residuals(
     show_loess: bool = False,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -41,6 +55,7 @@ def plot_residuals(
         title         : 图标题
         show_zero_line: 是否显示零线参考
         show_loess    : 是否显示 LOESS 平滑曲线（需要 statsmodels）
+        lang          : 语言设置
 
     示例:
         >>> y_true = np.array([1, 2, 3, 4, 5])
@@ -57,7 +72,7 @@ def plot_residuals(
 
     residuals = y_true - y_pred
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
     colors = [c["color"] for c in plt.rcParams["axes.prop_cycle"]]
@@ -76,7 +91,12 @@ def plot_residuals(
                    linewidth=2, label="LOESS")
             ax.legend()
         except ImportError:
-            pass
+            warnings.warn(
+                "show_loess=True 需要安装 statsmodels，已跳过 LOESS 曲线。\n"
+                "请运行: pip install statsmodels",
+                UserWarning,
+                stacklevel=3,
+            )
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -96,6 +116,7 @@ def plot_qq(
     show_line: bool = True,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -112,12 +133,13 @@ def plot_qq(
         ylabel      : Y 轴标签
         title       : 图标题
         show_line   : 是否显示参考线
+        lang        : 语言设置
 
     示例:
         >>> data = np.random.normal(0, 1, 100)
         >>> fig, ax = sp.plot_qq(data, title="正态性检验")
     """
-    from scipy import stats
+    stats = _check_scipy_stats()
 
     data = np.asarray(data, dtype=float)
     data = data[np.isfinite(data)]
@@ -137,7 +159,7 @@ def plot_qq(
             f"未知分布: {distribution}。可选: {list(dist_map.keys())}"
         )
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
     colors = [c["color"] for c in plt.rcParams["axes.prop_cycle"]]
@@ -176,6 +198,7 @@ def plot_bland_altman(
     ci: float = 0.95,
     venue: Optional[str] = None,
     palette: Optional[str] = None,
+    lang: Optional[str] = None,
     **kwargs: Any,
 ) -> PlotResult:
     """
@@ -189,6 +212,7 @@ def plot_bland_altman(
         title  : 图标题
         show_ci: 是否显示一致性界限的置信区间
         ci     : 置信水平，默认 0.95
+        lang   : 语言设置
 
     示例:
         >>> method_a = np.array([1.1, 2.0, 3.2, 4.1, 5.0])
@@ -196,7 +220,7 @@ def plot_bland_altman(
         >>> fig, ax = sp.plot_bland_altman(method_a, method_b,
         ...     title="两种方法一致性分析")
     """
-    from scipy import stats
+    stats = _check_scipy_stats()
 
     y1 = np.asarray(y1)
     y2 = np.asarray(y2)
@@ -215,7 +239,7 @@ def plot_bland_altman(
     upper_loa = mean_diff + 1.96 * std_diff
     lower_loa = mean_diff - 1.96 * std_diff
 
-    effective_venue = apply_resolved_style(venue, palette)
+    effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
 
     colors = [c["color"] for c in plt.rcParams["axes.prop_cycle"]]
@@ -257,4 +281,114 @@ def plot_bland_altman(
     return PlotResult(fig, ax, metadata={"venue": venue, "palette": palette})
 
 
-__all__ = ["plot_residuals", "plot_qq", "plot_bland_altman"]
+def plot_density(
+    data: np.ndarray,
+    xlabel: str = "",
+    ylabel: str = "Density",
+    title: str = "",
+    bw_method: Optional[float] = None,
+    fill: bool = True,
+    alpha: float = 0.3,
+    venue: Optional[str] = None,
+    palette: Optional[str] = None,
+    lang: Optional[str] = None,
+    **kwargs: Any,
+) -> PlotResult:
+    """绘制核密度估计曲线。
+
+    参数:
+        lang: 语言设置
+    """
+    stats = _check_scipy_stats()
+
+    values = np.asarray(data, dtype=float)
+    values = values[np.isfinite(values)]
+    if values.size < 2:
+        raise ValueError("plot_density 至少需要 2 个有效数据点")
+
+    kde = stats.gaussian_kde(values, bw_method=bw_method)
+    x_eval = np.linspace(values.min(), values.max(), 256)
+    y_eval = kde(x_eval)
+
+    effective_venue = apply_resolved_style(venue, palette, lang)
+    fig, ax = new_figure(effective_venue)
+
+    (line,) = ax.plot(x_eval, y_eval, **kwargs)
+    if fill:
+        ax.fill_between(x_eval, y_eval, alpha=alpha, color=line.get_color())
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title(title)
+    ax.tick_params(direction="in")
+    return PlotResult(fig, ax, metadata={"venue": venue, "palette": palette})
+
+
+def plot_multi_density(
+    data_list: List[np.ndarray],
+    labels: Optional[List[str]] = None,
+    xlabel: str = "",
+    ylabel: str = "Density",
+    title: str = "",
+    bw_method: Optional[float] = None,
+    fill: bool = False,
+    alpha: float = 0.2,
+    venue: Optional[str] = None,
+    palette: Optional[str] = None,
+    lang: Optional[str] = None,
+    **kwargs: Any,
+) -> PlotResult:
+    """绘制多组核密度估计曲线。
+
+    参数:
+        lang: 语言设置
+    """
+    stats = _check_scipy_stats()
+    if not data_list:
+        raise ValueError("data_list 不能为空")
+
+    normalized_data = []
+    for i, values in enumerate(data_list):
+        arr = np.asarray(values, dtype=float)
+        arr = arr[np.isfinite(arr)]
+        if arr.size < 2:
+            raise ValueError(f"data_list[{i}] 至少需要 2 个有效数据点")
+        normalized_data.append(arr)
+
+    if labels is None:
+        labels = [f"Series {i + 1}" for i in range(len(normalized_data))]
+    elif len(labels) != len(normalized_data):
+        raise ValueError(
+            f"labels 长度 ({len(labels)}) 与 data_list 长度 ({len(normalized_data)}) 不一致"
+        )
+
+    effective_venue = apply_resolved_style(venue, palette, lang)
+    fig, ax = new_figure(effective_venue)
+
+    all_values = np.concatenate(normalized_data)
+    x_eval = np.linspace(all_values.min(), all_values.max(), 256)
+
+    for values, label in zip(normalized_data, labels):
+        kde = stats.gaussian_kde(values, bw_method=bw_method)
+        y_eval = kde(x_eval)
+        (line,) = ax.plot(x_eval, y_eval, label=label, **kwargs)
+        if fill:
+            ax.fill_between(x_eval, y_eval, alpha=alpha, color=line.get_color())
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title(title)
+    ax.legend()
+    ax.tick_params(direction="in")
+    return PlotResult(fig, ax, metadata={"venue": venue, "palette": palette})
+
+
+__all__ = [
+    "plot_residuals",
+    "plot_qq",
+    "plot_bland_altman",
+    "plot_density",
+    "plot_multi_density",
+]

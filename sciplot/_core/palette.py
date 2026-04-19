@@ -3,14 +3,14 @@
 
 配色体系说明
 ============
-SciPlot 内置 4 套精选配色方案，均不依赖 SciencePlots：
+SciPlot 内置多套精选配色方案，均不依赖 SciencePlots：
 
   pastel  — 柔和粉彩（6 色），适合大多数论文场景
   ocean   — 海洋蓝绿（6 色），适合水文/海洋/气象类图表
   forest  — 森林渐变（6 色），适合生态/环保/农业类图表
   sunset  — 日落暖色（5 色），适合能量/热力/温度类图表
 
-每套配色均自动生成 1-N 色子集（如 pastel-1 ~ pastel-6）。
+基础色系自动生成 1-N 色子集（如 pastel-1 ~ pastel-6）。
 
   自定义（用户运行时注册）
     set_custom_palette(colors, name)  — 注册单色组
@@ -28,6 +28,7 @@ from typing import Dict, List, Optional
 
 import matplotlib.pyplot as plt
 from matplotlib import cycler
+from matplotlib.colors import LinearSegmentedColormap
 import warnings
 
 _HEX_COLOR_PATTERN = re.compile(r'^#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?$')
@@ -154,7 +155,7 @@ class _UserPaletteStore:
 
 
 # ============================================================================
-# 四大内置配色系（每种都有 1-N 色子集）
+# 内置配色系（基础色系具备 1-N 子集）
 # ============================================================================
 
 # 1. Pastel 柔和粉彩（默认首选）
@@ -209,13 +210,52 @@ SUNSET_PALETTE: Dict[str, List[str]] = {
     "sunset-5": ["#D44132", "#F45E4A", "#FF7A62", "#FF967C", "#FFB296"],
 }
 
-# 合并所有内置配色（顺序：pastel > ocean > forest > sunset）
+# 6. RMB 人民币主题配色（特色）
+RMB_PALETTES: Dict[str, List[str]] = {
+    "100yuan": ["#780018", "#AA0033", "#DD0022", "#CC0044", "#FA8095"],
+    "50yuan":  ["#25362B", "#276E3D", "#56B76A", "#3C4061", "#8E8E99"],
+    "20yuan":  ["#532F1A", "#6B4E25", "#7F5643", "#796A5D", "#BE9A62"],
+    "10yuan":  ["#242F4D", "#465A66", "#6382AA", "#828E99", "#7F606D"],
+    "5yuan":   ["#413A4C", "#63576F", "#56B76A", "#6F8DB1", "#B3A479"],
+    "1yuan":   ["#3C3F27", "#5A5745", "#9DA780", "#937539", "#C5AB71"],
+}
+
+# 7. 发散型配色（热力图/相关矩阵）
+DIVERGING_PALETTES: Dict[str, List[str]] = {
+    "rdbu": ["#8B1C2D", "#C44B5E", "#E8A0AA", "#F5F5F5", "#A0C8E0", "#4B7BA8", "#1C3D6B"],
+    "coolwarm": ["#3A5FCC", "#7A9EF0", "#C8D8F8", "#F5F5F5", "#F8C8C8", "#F07A7A", "#CC3A3A"],
+}
+
+# 合并所有内置配色
 RESIDENT_PALETTES: Dict[str, List[str]] = {
     **PASTEL_PALETTE,
+    **EARTH_PALETTE,
     **OCEAN_PALETTE,
     **FOREST_PALETTE,
     **SUNSET_PALETTE,
+    **RMB_PALETTES,
+    **DIVERGING_PALETTES,
 }
+
+
+def _register_diverging_cmaps() -> None:
+    """将 SciPlot 发散配色注册为 matplotlib colormap。"""
+    for name, colors in DIVERGING_PALETTES.items():
+        try:
+            plt.colormaps[name]
+            continue
+        except Exception:
+            pass
+
+        cmap = LinearSegmentedColormap.from_list(name, colors)
+        try:
+            plt.colormaps.register(cmap, name=name)
+        except Exception:
+            # 重复注册或低版本兼容问题时静默跳过，不影响主流程。
+            pass
+
+
+_register_diverging_cmaps()
 
 # 所有内置配色名（不含用户自定义）
 ALL_BUILTIN_PALETTES: List[str] = list(RESIDENT_PALETTES.keys())
@@ -245,7 +285,7 @@ def apply_palette(palette: str, n_colors: Optional[int] = None) -> None:
     """
     colors = None
 
-    # 1. 四大内置配色
+    # 1. 内置配色
     if palette in RESIDENT_PALETTES:
         colors = RESIDENT_PALETTES[palette]
     # 2. 用户自定义配色
@@ -343,7 +383,7 @@ def list_all_palettes() -> List[str]:
 
 
 def list_resident_palettes() -> List[str]:
-    """列出四大内置配色系（pastel / ocean / forest / sunset 及其子集）"""
+    """列出所有内置配色（含基础色系、RMB、发散型等）"""
     return list(RESIDENT_PALETTES.keys())
 
 
@@ -370,6 +410,16 @@ def list_forest_subsets() -> List[str]:
 def list_sunset_subsets() -> List[str]:
     """列出 sunset 系列名称"""
     return list(SUNSET_PALETTE.keys())
+
+
+def list_rmb_palettes() -> List[str]:
+    """列出人民币配色方案名称"""
+    return list(RMB_PALETTES.keys())
+
+
+def list_diverging_palettes() -> List[str]:
+    """列出发散型配色方案名称"""
+    return list(DIVERGING_PALETTES.keys())
 
 
 def register_color_scheme(
