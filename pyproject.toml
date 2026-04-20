@@ -46,6 +46,8 @@ dev = [
     "twine",
     "pytest",
     "pytest-cov",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
 ]
 ml = [
     "scikit-learn>=1.0.0",
