@@ -281,12 +281,12 @@ def validate_array_like(
             )
 
     if isinstance(data, np.ndarray):
-        result = data.tolist()
+        result: List[Any] = data.tolist()
     elif isinstance(data, (list, tuple)):
         result = list(data)
     else:
         try:
-            result = list(data)  # type: ignore
+            result = list(data)
         except TypeError:
             raise TypeError(
                 f"参数 '{name}' 必须是数组类型，实际类型: {type(data).__name__}"

@@ -42,8 +42,11 @@ SciPlot Academic — 期刊级科研绘图库
     nature（默认）| ieee | aps | springer | thesis | presentation
 """
 
+from __future__ import annotations
+
 from pathlib import Path as _Path
 from types import MappingProxyType as _MappingProxyType
+from typing import Any
 
 
 def _read_local_version() -> str:
@@ -375,24 +378,34 @@ _LAZY_EXT = {
 }
 
 
-def __getattr__(name: str):
-    if name in _LAZY_EXT:
-        import importlib
+def __getattr__(name: str) -> Any:
+    """延迟加载扩展模块。
+    
+    当访问需要额外依赖的函数时，动态导入相应模块。
+    如果依赖未安装，提供详细的安装指导。
+    """
+    if name not in _LAZY_EXT:
+        raise AttributeError(f"module 'sciplot' has no attribute {name!r}")
+    
+    import importlib
 
-        module_path, dep_name = _LAZY_EXT[name]
-        try:
-            mod = importlib.import_module(module_path)
-            attr = getattr(mod, name)
-        except ImportError:
-            raise ImportError(
-                f"sp.{name}() 需要安装 {dep_name}。\n"
-                f"请运行: pip install {dep_name}"
-            ) from None
+    module_path, dep_name = _LAZY_EXT[name]
+    try:
+        mod = importlib.import_module(module_path)
+        attr = getattr(mod, name)
+    except ImportError as e:
+        # 优先推荐 uv，同时提供 pip 作为备选
+        install_cmd_uv = f"uv pip install {dep_name}"
+        install_cmd_pip = f"pip install {dep_name}"
+        raise ImportError(
+            f"sp.{name}() 需要安装 {dep_name}。\n"
+            f"推荐安装方式: {install_cmd_uv}\n"
+            f"或: {install_cmd_pip}"
+        ) from e
 
-        globals()[name] = attr
-        return attr
-
-    raise AttributeError(f"module 'sciplot' has no attribute {name!r}")
+    # 缓存到模块全局命名空间，避免重复导入
+    globals()[name] = attr
+    return attr
 
 
 def inspect() -> None:

@@ -25,7 +25,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Any, Literal
+from typing import Dict, List, Optional, Any, Literal, cast
 from contextlib import contextmanager
 from types import TracebackType
 import copy
@@ -66,7 +66,7 @@ class StyleContext:
         """获取当前线程的上下文栈"""
         if not hasattr(cls._local, "stack"):
             cls._local.stack = []
-        return cls._local.stack
+        return cast(List["StyleContext"], cls._local.stack)
 
     def __init__(
         self,

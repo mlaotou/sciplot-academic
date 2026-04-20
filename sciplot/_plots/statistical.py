@@ -40,7 +40,7 @@ def _get_cycle_colors() -> List[str]:
     return colors
 
 
-def _try_import_scipy_stats():
+def _try_import_scipy_stats() -> Any:
     """尝试导入 scipy.stats，失败时返回 None。"""
     try:
         from scipy import stats
@@ -49,14 +49,14 @@ def _try_import_scipy_stats():
         return None
 
 
-def _check_scipy_stats():
+def _check_scipy_stats() -> Any:
     """检查 scipy.stats 可用性并返回模块对象。"""
     stats = _try_import_scipy_stats()
     if stats is not None:
         return stats
     raise ImportError(
         "统计图表功能需要安装 scipy。\n"
-        "请运行: pip install scipy 或 pip install sciplot-academic[statistical]"
+        "请运行: uv pip install scipy 或 pip install scipy"
     )
 
 

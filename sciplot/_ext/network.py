@@ -24,11 +24,13 @@ def _check_networkx():
     try:
         import networkx as nx
         return nx
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
             "网络图功能需要安装 networkx。\n"
-            "请运行: pip install networkx 或 pip install sciplot-academic[network]"
-        )
+            "推荐安装方式: uv pip install networkx\n"
+            "或: pip install networkx\n"
+            "或安装完整扩展: uv pip install sciplot-academic[network]"
+        ) from e
 
 
 def _get_layout(G, layout: str, **kwargs):

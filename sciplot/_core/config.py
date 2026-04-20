@@ -21,17 +21,21 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import warnings
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union, cast, Type
 from matplotlib.figure import Figure
+
+# 配置模块日志记录器
+_logger = logging.getLogger(__name__)
 
 _CONFIG_LOCK = threading.Lock()
 _TOML_IMPORT_WARNED = False
 
 
-def _get_supported_formats() -> frozenset:
+def _get_supported_formats() -> frozenset[str]:
     """延迟获取支持的文件格式，避免导入时创建Figure实例。"""
     try:
         # 使用非交互式后端避免GUI初始化问题
@@ -49,19 +53,19 @@ def _get_supported_formats() -> frozenset:
 _SUPPORTED_SAVE_FORMATS = _get_supported_formats()
 
 
-def _load_toml_module():
+def _load_toml_module() -> Any:
     """按优先级加载 TOML 解析器（tomllib -> tomli）。"""
     global _TOML_IMPORT_WARNED
 
     try:
-        import tomllib as _toml_module
-        return _toml_module
+        import tomllib as toml_module
+        return toml_module
     except ImportError:
         pass
 
     try:
-        import tomli as _toml_module
-        return _toml_module
+        import tomli as toml_module
+        return toml_module
     except ImportError:
         if not _TOML_IMPORT_WARNED:
             warnings.warn(
@@ -72,7 +76,7 @@ def _load_toml_module():
             _TOML_IMPORT_WARNED = True
         return None
 
-_CONFIG_TYPES: Dict[str, Tuple[type, ...]] = {
+_CONFIG_TYPES: Dict[str, Tuple[Type[Any], ...]] = {
     "venue": (str,),
     "palette": (str,),
     "lang": (str,),
@@ -81,7 +85,7 @@ _CONFIG_TYPES: Dict[str, Tuple[type, ...]] = {
 }
 
 
-def _normalize_formats(formats: Union[Tuple[str, ...], list]) -> Tuple[str, ...]:
+def _normalize_formats(formats: Union[Tuple[str, ...], List[str]]) -> Tuple[str, ...]:
     """规范化并校验 formats 配置。"""
     normalized = tuple(formats)
     if not normalized:
@@ -279,9 +283,9 @@ class SciPlotConfig:
                 raise FileNotFoundError(f"配置文件不存在: {config_path}")
             return cls._load_config_file(config_path)
 
-        config_path = cls._find_config_file()
-        if config_path is not None:
-            return cls._load_config_file(config_path)
+        found_config_path = cls._find_config_file()
+        if found_config_path is not None:
+            return cls._load_config_file(found_config_path)
 
         return False
 
@@ -366,12 +370,17 @@ class SciPlotConfig:
         """
         toml_module = _load_toml_module()
         if toml_module is None:
+            _logger.debug("TOML 解析模块不可用，跳过配置文件读取")
             return None
 
         try:
             with open(path, "rb") as f:
-                return toml_module.load(f)
-        except (OSError, toml_module.TOMLDecodeError):
+                return cast(Dict[str, Any], toml_module.load(f))
+        except OSError as e:
+            _logger.warning(f"无法读取配置文件 {path}: {e}")
+            return None
+        except toml_module.TOMLDecodeError as e:
+            _logger.error(f"配置文件 {path} 格式错误: {e}")
             return None
 
     @classmethod

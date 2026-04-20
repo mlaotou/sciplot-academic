@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, cast
 import math
 import re
 
@@ -244,13 +244,13 @@ def check_color_contrast(
         r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
 
         # 转换为 sRGB
-        r, g, b = r / 255.0, g / 255.0, b / 255.0
+        rf, gf, bf = r / 255.0, g / 255.0, b / 255.0
 
         # 应用 gamma 校正
         def _correct(c: float) -> float:
             return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
 
-        r, g, b = _correct(r), _correct(g), _correct(b)
+        r, g, b = _correct(rf), _correct(gf), _correct(bf)
         return 0.2126 * r + 0.7152 * g + 0.0722 * b
 
     bg_hex = _normalize_hex(bg_color, "bg_color")

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import shutil
 import threading
-from typing import Any, Dict, Optional, Tuple, NamedTuple
+from typing import Any, Dict, List, Optional, Tuple, NamedTuple, cast
 
 import matplotlib.pyplot as plt
 
@@ -18,33 +18,48 @@ import matplotlib.pyplot as plt
 _thread_local = threading.local()
 
 
+def _ensure_thread_local_initialized() -> None:
+    """确保线程局部状态已初始化。"""
+    if not hasattr(_thread_local, "_initialized"):
+        _thread_local.lang = None
+        _thread_local.venue = None
+        _thread_local.palette = None
+        _thread_local._initialized = True
+
+
 def get_current_lang() -> Optional[str]:
     """获取当前设置的语言代码（线程安全）"""
-    return getattr(_thread_local, "lang", None)
+    _ensure_thread_local_initialized()
+    return cast(Optional[str], _thread_local.lang)
 
 
 def set_current_lang(lang: Optional[str]) -> None:
     """设置当前语言代码（线程安全）"""
+    _ensure_thread_local_initialized()
     _thread_local.lang = lang
 
 
 def get_current_venue() -> Optional[str]:
     """获取当前设置的 venue（线程安全）。"""
-    return getattr(_thread_local, "venue", None)
+    _ensure_thread_local_initialized()
+    return cast(Optional[str], _thread_local.venue)
 
 
 def set_current_venue(venue: Optional[str]) -> None:
     """设置当前 venue（线程安全）。"""
+    _ensure_thread_local_initialized()
     _thread_local.venue = venue
 
 
 def get_current_palette() -> Optional[str]:
     """获取当前设置的 palette（线程安全）。"""
-    return getattr(_thread_local, "palette", None)
+    _ensure_thread_local_initialized()
+    return cast(Optional[str], _thread_local.palette)
 
 
 def set_current_palette(palette: Optional[str]) -> None:
     """设置当前 palette（线程安全）。"""
+    _ensure_thread_local_initialized()
     _thread_local.palette = palette
 
 

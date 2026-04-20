@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, overload, Literal, Sequence
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, overload, Literal, Sequence, cast
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -67,9 +67,9 @@ class PlotResult:
     def _get_target_ax(self, ax_index: int = 0) -> Axes:
         """根据 ax_index 获取目标子图，单子图时忽略索引。"""
         if not self._is_array:
-            return self._ax  # type: ignore[return-value]
+            return cast(Axes, self._ax)
 
-        flat_axes = list(self._ax.flat)  # type: ignore[union-attr]
+        flat_axes = list(cast(np.ndarray, self._ax).flat)
         if ax_index < 0 or ax_index >= len(flat_axes):
             raise IndexError(
                 f"ax_index 超出范围: {ax_index}，可用范围 [0, {len(flat_axes) - 1}]"
@@ -97,7 +97,7 @@ class PlotResult:
             raise AttributeError(
                 "多子图请使用 result.axes 或 result.ax_array 访问"
             )
-        return self._ax  # type: ignore
+        return cast(Axes, self._ax)
 
     @property
     def axes(self) -> Union[Axes, np.ndarray]:
@@ -109,7 +109,7 @@ class PlotResult:
         """获取 Axes 数组（多子图时）"""
         if not self._is_array:
             raise AttributeError("单个子图请使用 result.ax 访问")
-        return self._ax  # type: ignore
+        return cast(np.ndarray, self._ax)
 
     @property
     def metadata(self) -> Dict[str, Any]:
@@ -133,9 +133,9 @@ class PlotResult:
     def __getitem__(self, index: int) -> Union[Figure, Axes]: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Tuple: ...
+    def __getitem__(self, index: slice) -> Tuple[Any, ...]: ...
 
-    def __getitem__(self, index: Union[int, slice]) -> Union[Figure, Union[Axes, np.ndarray], Tuple]:
+    def __getitem__(self, index: Union[int, slice]) -> Union[Figure, Union[Axes, np.ndarray], Tuple[Any, ...]]:
         """支持索引访问: result[0], result[1]"""
         if index == 0:
             return self._fig
@@ -436,9 +436,9 @@ class ComboPlotResult(PlotResult):
     def __getitem__(self, index: int) -> Union[Figure, Optional[Axes]]: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Tuple: ...
+    def __getitem__(self, index: slice) -> Tuple[Any, ...]: ...
 
-    def __getitem__(self, index: Union[int, slice]) -> Union[Figure, Optional[Axes], Tuple]:
+    def __getitem__(self, index: Union[int, slice]) -> Union[Figure, Optional[Axes], Tuple[Any, ...]]:
         values: Tuple[Figure, Axes, Optional[Axes]] = (self._fig, self.ax_bar, self.ax_line)
         if isinstance(index, slice):
             return values[index]
@@ -489,7 +489,7 @@ class GridSpecResult:
         """获取 GridSpec 对象（别名）"""
         return self._gridspec
 
-    def add_subplot(self, *args, **kwargs) -> Axes:
+    def add_subplot(self, *args: Any, **kwargs: Any) -> Axes:
         """添加子图"""
         return self._fig.add_subplot(*args, **kwargs)
 
@@ -506,9 +506,9 @@ class GridSpecResult:
     def __getitem__(self, index: int) -> Union[Figure, GridSpec]: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Tuple: ...
+    def __getitem__(self, index: slice) -> Tuple[Any, ...]: ...
 
-    def __getitem__(self, index: Union[int, slice]) -> Union[Figure, GridSpec, Tuple]:
+    def __getitem__(self, index: Union[int, slice]) -> Union[Figure, GridSpec, Tuple[Any, ...]]:
         """支持索引访问"""
         if index == 0:
             return self._fig

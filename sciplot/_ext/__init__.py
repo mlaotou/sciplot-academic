@@ -3,11 +3,15 @@ SciPlot 扩展模块
 包含机器学习可视化、3D 可视化等高级功能
 """
 
+from __future__ import annotations
+
 import importlib
+from typing import Any
 
 __all__ = ["ml", "plot3d"]
 
-def __getattr__(name):
+
+def __getattr__(name: str) -> Any:
     """延迟导入扩展模块"""
     if name in {"ml", "plot3d"}:
         try:

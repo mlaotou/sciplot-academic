@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,6 +15,9 @@ from matplotlib.gridspec import GridSpec
 
 from sciplot._core.style import VENUES
 from sciplot._core.palette import DEFAULT_PALETTE
+
+if TYPE_CHECKING:
+    from sciplot._core.result import GridSpecResult
 
 
 # ============================================================================
@@ -101,14 +104,14 @@ def new_figure(
     """
     if venue is None:
         if figsize is None:
-            return plt.subplots(**kwargs)
-        return plt.subplots(figsize=figsize, **kwargs)
+            return cast(Tuple[Figure, Axes], plt.subplots(**kwargs))
+        return cast(Tuple[Figure, Axes], plt.subplots(figsize=figsize, **kwargs))
 
     if venue not in VENUES:
         raise ValueError(f"未知 venue '{venue}'，可用选项: {list(VENUES.keys())}")
     default_figsize = VENUES[venue].figsize
     size = figsize if figsize is not None else default_figsize
-    return plt.subplots(figsize=size, **kwargs)
+    return cast(Tuple[Figure, Axes], plt.subplots(figsize=size, **kwargs))
 
 
 # ============================================================================
@@ -212,15 +215,17 @@ def paper_subplots(
     setup_style(venue, effective_palette, effective_lang)
 
     if figsize is not None:
-        final_figsize = figsize
+        final_figsize: Tuple[float, float] = figsize
     else:
         layout_key = f"{nrows}x{ncols}"
         venue_layouts = PAPER_LAYOUTS.get(venue, {})
-        final_figsize = venue_layouts.get(layout_key)
-        if final_figsize is None:
+        layout_figsize = venue_layouts.get(layout_key)
+        if layout_figsize is None:
             # 回退：基于 venue 默认尺寸等比缩放
             base_fs = VENUES.get(venue, VENUES["nature"]).figsize
             final_figsize = (base_fs[0] * ncols * 0.85, base_fs[1] * nrows * 0.85)
+        else:
+            final_figsize = layout_figsize
 
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=final_figsize, **kwargs)
     _set_ticks_inward(axes)

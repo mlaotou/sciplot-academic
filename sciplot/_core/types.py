@@ -27,10 +27,14 @@ from numpy.typing import ArrayLike, NDArray
 # 基础类型别名
 # ═══════════════════════════════════════════════════════════════
 
-# 数组类型
-Array = Union[List[float], Tuple[float, ...], np.ndarray]
-NumericArray = NDArray[np.float64]
-IntArray = NDArray[np.int64]
+# 数值类型变量（用于泛型）
+NumberType = TypeVar("NumberType", int, float, np.number)
+
+# 数组类型 - 使用泛型支持更广泛的数值类型
+Array = Union[List[NumberType], Tuple[NumberType, ...], np.ndarray]
+# 更宽泛的数值数组类型，接受所有 numpy 数值类型
+NumericArray = NDArray[np.number]
+IntArray = NDArray[np.integer]
 BoolArray = NDArray[np.bool_]
 
 # 可选数组
@@ -146,7 +150,7 @@ class PlotFunction(Protocol):
 
 T = TypeVar("T")
 T_co = TypeVar("T_co", covariant=True)
-NumberType = TypeVar("NumberType", int, float)
+# NumberType 已移至基础类型别名部分
 ArrayType = TypeVar("ArrayType", bound=ArrayLike)
 
 

@@ -261,13 +261,13 @@ def plot_scatter_matrix(
     if diag not in {"hist", "kde", "none"}:
         raise ValueError("diag 仅支持 'hist'、'kde'、'none'")
 
-    scipy_stats = None
+    scipy_stats_module = None
     if diag == "kde":
         try:
-            from scipy import stats as scipy_stats
+            from scipy import stats as scipy_stats_module
         except ImportError as e:
             raise ImportError(
-                "diag='kde' 需要安装 scipy。请运行: pip install scipy"
+                "diag='kde' 需要安装 scipy。请运行: uv pip install scipy 或 pip install scipy"
             ) from e
 
     effective_venue = apply_resolved_style(venue, palette, lang)
@@ -309,8 +309,8 @@ def plot_scatter_matrix(
                     ax.hist(x_col, bins=20, alpha=0.75)
                 elif diag == "kde":
                     finite = x_col[np.isfinite(x_col)]
-                    if finite.size >= 2 and scipy_stats is not None:
-                        kde = scipy_stats.gaussian_kde(finite)
+                    if finite.size >= 2 and scipy_stats_module is not None:
+                        kde = scipy_stats_module.gaussian_kde(finite)
                         x_eval = np.linspace(finite.min(), finite.max(), 200)
                         y_eval = kde(x_eval)
                         ax.plot(x_eval, y_eval)

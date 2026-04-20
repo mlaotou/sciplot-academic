@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Sequence
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -127,8 +127,8 @@ def _validate_annotations_axis_compatibility(
 
 
 def plot_timeseries(
-    t: Union[List, np.ndarray],
-    y: Union[List, np.ndarray],
+    t: Union[Sequence[Any], np.ndarray],
+    y: Union[Sequence[Any], np.ndarray],
     events: Optional[List[Dict[str, Any]]] = None,
     shade_regions: Optional[List[Dict[str, Any]]] = None,
     rolling_mean: Optional[int] = None,
@@ -259,7 +259,7 @@ def plot_timeseries(
 
 
 def plot_multi_timeseries(
-    t: Union[List, np.ndarray],
+    t: Union[Sequence[Any], np.ndarray],
     y_list: List[np.ndarray],
     labels: Optional[List[str]] = None,
     events: Optional[List[Dict[str, Any]]] = None,

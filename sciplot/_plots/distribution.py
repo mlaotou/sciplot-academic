@@ -55,23 +55,26 @@ def plot_bar(
         ... )
         >>> sp.save(fig, "accuracy_bar")
     """
-    # 输入验证
-    if not categories:
-        raise ValueError("参数 'categories' 不能为空列表")
-    values = np.asarray(validate_array_like(values, "values"), dtype=float)
-    if len(categories) != len(values):
-        raise ValueError(
-            f"categories 长度 ({len(categories)}) 与 values 长度 ({len(values)}) 不一致"
-        )
-    if not np.all(np.isfinite(values)):
-        raise ValueError("values 不能包含 NaN 或 Inf")
-    width = validate_positive_number(width, "width", allow_zero=False)
+    # 输入验证 - 使用 EAFP 风格（Easier to Ask for Forgiveness than Permission）
+    try:
+        if len(categories) == 0:
+            raise ValueError("参数 'categories' 不能为空列表")
+        values_arr = np.asarray(values, dtype=float)
+        if len(categories) != len(values_arr):
+            raise ValueError(
+                f"categories 长度 ({len(categories)}) 与 values 长度 ({len(values_arr)}) 不一致"
+            )
+        if not np.all(np.isfinite(values_arr)):
+            raise ValueError("values 不能包含 NaN 或 Inf")
+        width = validate_positive_number(width, "width", allow_zero=False)
+    except TypeError as e:
+        raise ValueError(f"参数类型错误: {e}") from e
 
     effective_venue = apply_resolved_style(venue, palette, lang)
     fig, ax = new_figure(effective_venue)
     colors = _get_cycle_colors()
     bar_colors = [colors[i % len(colors)] for i in range(len(categories))]
-    ax.bar(categories, values, width=width, color=bar_colors, **kwargs)
+    ax.bar(categories, values_arr, width=width, color=bar_colors, **kwargs)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     if title:
